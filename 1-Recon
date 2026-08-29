@@ -1,0 +1,21 @@
+# 1. Enumeración y Escaneo (Recon)
+
+La fase más crítica. No saltes ningún puerto.
+
+**Nmap - Escaneo TCP completo y rápido:**
+
+  sudo nmap -p- --min-rate=5000 -T4 -v <IP> -oN nmap_all_ports.txt
+
+**Nmap - Escaneo exhaustivo de servicios detectados:**
+
+sudo nmap -p<PUERTOS> -sCV -T4 <IP> -oN nmap_detailed.txt
+
+**Nmap - Escaneo UDP (puertos comunes):**
+
+sudo nmap -sU --top-ports 100 <IP> -oN nmap_udp.txt
+
+**Fuerza bruta de directorios web (Gobuster / Feroxbuster):**
+
+gobuster dir -u http://<IP>/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -t 50 -x php,txt,html
+
+feroxbuster -u http://<IP>/ -w /usr/share/wordlists/dirb/common.txt --threads 50
