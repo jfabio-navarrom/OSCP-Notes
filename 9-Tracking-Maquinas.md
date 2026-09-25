@@ -19,14 +19,14 @@ Marca cuando cumplas cada hito. No se negocian: son requisitos para avanzar de f
 
 | Métrica | Cuenta |
 |---------|--------|
-| Máquinas intentadas (total) | 0 |
+| Máquinas intentadas (total) | 2 |
 | Resueltas 100% solas ✅ | 0 |
-| Resueltas con pista ❌ | 0 |
+| Resueltas con pista ❌ | 2 |
 | **Tasa de independencia** (solas ÷ total) | 0% |
 | Medium seguidas sin pista (racha actual) | 0 |
 | Sets de AD completados solo | 0 |
 
-> Objetivo de tasa de independencia antes del examen: **≥70%** y subiendo. Si a mitad de Fase 2 sigue baja, estás abriendo writeups demasiado rápido — aguanta más el "trabarse productivo".
+> Objetivo de tasa de independencia antes del examen: **≥70%** y subiendo. Si a mitad de Fase 2 sigue baja, estás abriendo writeups demasiado rápido — aguanta más el "trabarse productivo". **Nota real de hoy:** 0% no es fracaso — es tu línea base honesta. Lo que importa es que la tendencia suba conforme avances, no el número de hoy.
 
 ---
 
@@ -34,7 +34,7 @@ Marca cuando cumplas cada hito. No se negocian: son requisitos para avanzar de f
 
 | # | Máquina | Fuente | OS | Fecha | Tiempo | Indep. | ¿Dónde me trabé? | Lección (→ al cheat sheet) |
 |---|---------|--------|----|-------|--------|--------|------------------|----------------------------|
-| 1 |  | HTB/PG |  |  |  | ✅/❌ |  |  |
+| 1 | Cap | HTB | Linux | 2026-09 | — | ✅/❌ | *(completar)* | *(completar)* |
 | 2 |  |  |  |  |  |  |  |  |
 | 3 |  |  |  |  |  |  |  |  |
 | 4 |  |  |  |  |  |  |  |  |
@@ -53,7 +53,7 @@ Marca cuando cumplas cada hito. No se negocian: son requisitos para avanzar de f
 
 | # | Máquina | Fuente | OS | Dific. | Fecha | Tiempo | Indep. | ¿Dónde me trabé? | Lección |
 |---|---------|--------|----|--------|-------|--------|--------|------------------|---------|
-| 1 |  |  |  | E/M |  |  | ✅/❌ |  |  |
+| 1 | Active | HTB | Windows/AD | Easy | 2026-09-25 | ~2.5h (con ayuda) | ❌ | (1) Confundí `GetNPUsers` con `GetUserSPNs` — no diferenciaba AS-REP de Kerberoasting. (2) Usé evil-winrm sin confirmar antes que 5985 estaba abierto → ECONNREFUSED, perdí tiempo. (3) Instalación de BloodHound CE desde cero (espacio en disco, collation de Postgres) consumió la mayor parte del tiempo, no la técnica en sí. | Ver `6-AD.md` actualizado: sección "NO CONFUNDIR" de Kerberos, y "elige herramienta según puerto abierto". Patrón completo: GPP/Groups.xml → gpp-decrypt → creds → BloodHound → Kerberoasting → hashcat → PtH/creds directas al DC. |
 | 2 |  |  |  |  |  |  |  |  |  |
 | 3 |  |  |  |  |  |  |  |  |  |
 | 4 |  |  |  |  |  |  |  |  |  |
@@ -117,9 +117,9 @@ Cada vez que caigas en uno, anótalo. El patrón que repites es tu debilidad rea
 
 | Máquina | En qué me perdí | Cuánto tiempo perdí | Cómo salí | Señal para la próxima |
 |---------|-----------------|---------------------|-----------|-----------------------|
-|  |  |  |  |  |
-|  |  |  |  |  |
-|  |  |  |  |  |
+| Active | Instalación de BloodHound CE desde cero (espacio en disco lleno, error de collation de PostgreSQL, confusión Neo4j vs interfaz real en :8080) | ~1h+ | Expandí partición con growpart/resize2fs, refresqué collation con `ALTER DATABASE ... REFRESH COLLATION VERSION` | **Ya resuelto para siempre** — BloodHound queda instalado y configurado; la próxima máquina de AD no debería tener este obstáculo. Verificar espacio en disco (`df -h`) al inicio de cada sesión nueva de todos modos. |
+| Active | Probé `evil-winrm` sin confirmar antes si el puerto 5985 estaba abierto | ~5 min | Vi `ECONNREFUSED`, cambié a `impacket-wmiexec` sobre el 445 | Antes de elegir herramienta de conexión (evil-winrm vs psexec/wmiexec), correr `nmap -p445,5985,5986 <IP>` primero — no asumir. |
+| Active | Confundí `GetNPUsers` (AS-REP) con `GetUserSPNs` (Kerberoasting) — intenté correr el comando equivocado para el ataque que quería hacer | ~10 min | Corregido en el momento revisando `6-AD.md` | Regla mental ya anotada en el repo: si el nombre de cuenta suena a cuenta de servicio (`SVC_*`), pensar primero en Kerberoasting, no AS-REP. |
 
 ---
 
@@ -131,10 +131,11 @@ Si la misma categoría aparece mucho en "¿dónde me trabé?", ahí va tu tiempo
 - [ ] Web (SQLi / LFI / upload)
 - [ ] PrivEsc Linux
 - [ ] PrivEsc Windows
-- [ ] Active Directory
+- [x] Active Directory — confusión entre técnicas de Kerberos (AS-REP vs Kerberoasting); confirmar puerto antes de elegir herramienta de conexión
 - [ ] Pivoting
 - [ ] Cracking / hashes
 - [ ] Gestión de tiempo / rabbit holes
+- [x] Setup de entorno/herramientas — instalación de BloodHound consumió tiempo desproporcionado (resuelto, no debería repetirse)
 
 ---
 
