@@ -53,7 +53,7 @@ Mira SIEMPRE a mano: código fuente (Ctrl+U), comentarios HTML, `robots.txt`, `s
 
 **Fuzzing de directorios y archivos:**
 ```bash
-feroxbuster -u http://<IP>/ -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -x php,txt,html,bak
+feroxbuster -u http://<IP>/ -w /usr/share/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-big.txt -x php,txt,html,bak
 gobuster dir -u http://<IP>/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -t 50 -x php,txt,html
 ```
 
