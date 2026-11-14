@@ -17,6 +17,9 @@ Notas personales de preparación para el examen OSCP / OSCP+. Referencia offline
 | 7 | [7-Pivoting.md](7-Pivoting.md) | Túneles y pivoting (ligolo, chisel, SSH) |
 | 8 | [8-Cracking.md](8-Cracking.md) | Password cracking (hashcat, John, Hydra) |
 | — | [ExamPlan.md](ExamPlan.md) | Metodología, árboles de decisión y template de reporte |
+| — | [MetodologiaAD.md](MetodologiaAD.md) | Cómo pensar un set de AD (árbol de decisiones, no comandos) |
+| — | [9-Tracking-Maquinas.md](9-Tracking-Maquinas.md) | Hoja de tracking de práctica (foco en independencia) |
+| — | [writeups/](writeups/) | Writeups reproducibles de máquinas resueltas + técnicas clave |
 
 ## Flujo rápido
 
@@ -25,7 +28,12 @@ Recon (1) → Enum servicios (2) → Explotación (3) → Shell + TTY (4)
    → PrivEsc (5) → [si es dominio] AD (6) + Pivoting (7)
    → Cracking (8) cuando aparezcan hashes
 Metodología y "qué hacer cuando encuentro X": ExamPlan.md
+AD, cómo pensarlo: MetodologiaAD.md   |   Ejemplos reales: writeups/
 ```
+
+## Writeups de máquinas
+
+En [`writeups/`](writeups/) hay cadenas completas y reproducibles de máquinas ya resueltas (Heist, ResourceD, Vault, Hutch, Astronaut, Internal), cada una con sus lecciones y callejones sin salida. Las técnicas que aparecen ahí (RBCD, GPO abuse, gMSA, LAPS, SeRestore, NTLM theft, SUID intérprete…) están además condensadas en los cheat sheets numerados para buscarlas rápido con `Ctrl+F`.
 
 ## Uso
 
