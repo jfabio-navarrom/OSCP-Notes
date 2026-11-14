@@ -1,6 +1,6 @@
 # Mi Metodología — Active Directory
 
-Esto no es una referencia de comandos (eso vive en `AD-Guia-Completa.md`). Esto es **cómo pienso** al atacar un set de AD, construido a partir de lo que ya probé que sé hacer solo en 7 máquinas reales (Active, Forest, Sauna, Monteverde, Timelapse, Return, Fluffy). Cuando me trabe en el examen, vuelvo a ESTE documento primero — es el árbol de decisiones, no el libro de comandos.
+Esto no es una referencia de comandos (eso vive en [`6-AD.md`](6-AD.md)). Esto es **cómo pienso** al atacar un set de AD, construido a partir de lo que ya probé que sé hacer solo en 7 máquinas reales (Active, Forest, Sauna, Monteverde, Timelapse, Return, Fluffy). Cuando me trabe en el examen, vuelvo a ESTE documento primero — es el árbol de decisiones, no el libro de comandos.
 
 ---
 

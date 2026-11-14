@@ -26,7 +26,7 @@ netstat -tulnp                       # servicios internos → pivoting
 
 ### Vectores clásicos
 - **`sudo -l` con NOPASSWD** → busca el binario en **GTFOBins** para escapar a root.
-- **SUID inusual** → GTFOBins.
+- **SUID inusual** → GTFOBins. 🔴 **Un intérprete con SUID** (`php`, `python`, `perl`, `ruby`, `bash`, `nmap`…) en la lista de SUID = root casi seguro: no es SUID por defecto en ninguna instalación limpia. Salta directo a GTFOBins con el filtro SUID. Ejemplo (Astronaut, [`writeups/astronaut-grav-writeup.md`](writeups/astronaut-grav-writeup.md)): `/usr/bin/php7.4 -r "pcntl_exec('/bin/sh', ['-p']);"` — el `-p` conserva `euid=0`, y `euid=0` ya es root efectivo aunque `uid` siga siendo bajo (lees `/root`).
 - **Capability** `cap_setuid`, etc. → GTFOBins.
 - **Cron** editable o con wildcard/PATH manipulable.
 - **Credenciales** en configs, `.bash_history`, `/var/www`, DBs, `.ssh`.
@@ -63,6 +63,13 @@ reg query HKCU\Software\Policies\Microsoft\Windows\Installer /v AlwaysInstallEle
   PrintSpoofer.exe -i -c cmd
   GodPotato.exe -cmd "cmd /c whoami"
   ```
+- **SeRestorePrivilege** (poder escribir CUALQUIER archivo, saltándose ACLs) → **SYSTEM** sobrescribiendo un binario que corre como SYSTEM. Clásico: cambiar `Utilman.exe` (o `sethc.exe`) por `cmd.exe` y dispararlo en la pantalla de login (RDP con NLA off → botón de Accesibilidad = consola SYSTEM). Writeup completo: [`writeups/heist-writeup.md`](writeups/heist-writeup.md).
+  ```cmd
+  :: Desde Kali, tras hacer el swap:
+  xfreerdp /v:<IP> /cert:ignore /sec:nla:off   :: -> Ease of Access -> cmd como SYSTEM
+  ```
+  > 🔴 El privilegio **no basta con estar "Enabled"**: el fichero debe abrirse en **modo backup** (`FILE_FLAG_BACKUP_SEMANTICS`). `copy`/`Copy-Item` normales dan `Access Denied`; `robocopy /B` exige SeBackup **y** SeRestore. Con solo SeRestore, abre el fichero tú mismo vía `CreateFile` desde PowerShell (bloque en el writeup de Heist). Activar el privilegio y escribir deben ocurrir en el **mismo proceso**.
+- **SeBackupPrivilege** (leer CUALQUIER archivo en modo backup) → copiar `C:\Windows\NTDS\ntds.dit` + el hive `SYSTEM` con `robocopy /B`, o volcar SAM/SYSTEM → `secretsdump` offline. En un DC = todos los hashes del dominio.
 - **Unquoted service path** con espacios y carpeta escribible → colocar binario malicioso.
 - **Permisos débiles en el binario/servicio** → reemplazarlo y reiniciar el servicio.
 - **AlwaysInstallElevated** (ambas claves = 1) → instalar `.msi` malicioso:

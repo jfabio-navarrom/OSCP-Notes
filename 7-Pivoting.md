@@ -40,6 +40,16 @@ proxychains nxc smb <IP_INTERNA> -u <USER> -p <PASS>
 proxychains evil-winrm -i <IP_INTERNA> -u <USER> -p <PASS>
 ```
 
+## sshuttle (VPN pobre sobre SSH — sin proxychains)
+
+Si tienes credenciales/clave SSH en el pivote, `sshuttle` enruta toda una subred por el túnel de forma transparente (no necesitas `proxychains` ni `-sT`).
+
+```bash
+sshuttle -r <user>@<IP_PIVOTE> <SUBNET_INTERNA>/24
+# Con clave:  sshuttle -r <user>@<IP> --ssh-cmd "ssh -i key.pem" <SUBNET>/24
+# Ahora nmap/nxc/evil-winrm alcanzan la red interna directamente.
+```
+
 ## SSH port forwarding (si tienes acceso SSH)
 ```bash
 ssh -L 8080:127.0.0.1:80 <user>@<IP>       # local: puerto interno → tu 8080
